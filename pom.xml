@@ -33,8 +33,7 @@
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.5.1</version>
                 <configuration>
-                    <mainClass>com.example.texteditor.Main</mainClass>
-
+                    <mainClass>com.example.texteditor.TextEditor</mainClass>
                 </configuration>
             </plugin>
         </plugins>
