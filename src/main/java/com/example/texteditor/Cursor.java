@@ -2,120 +2,325 @@ package com.example.texteditor;
 
 import java.util.List;
 
-// Manages cursor position and scrolling
+/**
+ * Manages the cursor position and scrolling behavior in a terminal-based text editor.
+ * Tracks cursor coordinates, handles line wrapping, and manages vertical scrolling.
+ */
 public class Cursor {
 
-    private static int cursorX = 0, cursorY = 0;
-    private static int offsetX = 0, offsetY = 0;
-    private static int cursorWrap = 0, pageWrap = 0, hiddenWrap = 0, hiddenWrapCooldown = 0;
+    private static final int PAGE_SCROLL_OFFSET = 2;
 
-    // Handles scrolling based on cursor movement
-    public void scroll(int keyPressed, List<String> content, int rows, int columns) {
+    private int cursorX;        // Current x-coordinate of the cursor (column)
+    private int cursorXcache;   // Cached x-coordinate for cursor movement
+    private int cursorY;        // Current y-coordinate of the cursor (line)
+    private int offsetY;        // Vertical scroll offset (first visible line)
+    private int cursorWrap;     // Accumulated line wraps for the cursor
+    private int pageWrap;       // Accumulated line wraps for the page
+    private int hiddenWrap;     // Hidden line wraps due to scrolling
+    private int hiddenWrapCooldown; // Cooldown for hidden wrap updates
+
+    /**
+     * Constructs a new Cursor with initialized position and scroll state.
+     */
+    public Cursor() {
+        this.cursorX = 0;
+        this.cursorXcache = 0;
+        this.cursorY = 0;
+        this.offsetY = 0;
+        this.cursorWrap = 0;
+        this.pageWrap = 0;
+        this.hiddenWrap = 0;
+        this.hiddenWrapCooldown = 0;
+    }
+
+    /**
+     * Handles scrolling based on cursor movement and key input.
+     *
+     * @param keyPressed The key code representing the user input.
+     * @param content    The list of text lines in the editor.
+     * @param rows       The number of visible rows in the terminal.
+     * @param usedRows   The number of rows currently occupied by content.
+     * @param columns    The number of columns in the terminal.
+     */
+    public void scroll(int keyPressed, List<String> content, int rows, int usedRows, int columns) {
+
+        if (content.size() <= 0) {
+            return;
+        }
+
         switch(keyPressed) {
             case TextEditor.ARROW_DOWN:
-                if (cursorY - rows + pageWrap - 1 >= 0 && offsetY - pageWrap + rows - 1 < cursorY) {
-                    int newContentWrap = getWrap(content.get(cursorY), columns);
-                    int newHiddenWrap = getWrap(content.get(offsetY), columns);
-                    int tempWrap = 0;
-                    for (int maxIter = newContentWrap; maxIter > 0; maxIter--) {
-                        newHiddenWrap += getWrap(content.get(offsetY + tempWrap + 1), columns);
-                        tempWrap++;
-                        if (newHiddenWrap >= newContentWrap) {
-                            break;
-                        }
-                    }
-                    if (hiddenWrapCooldown <= 0) {
-                        offsetY = offsetY + 1 + tempWrap;
-                        hiddenWrap += newHiddenWrap;
-                        hiddenWrapCooldown = newHiddenWrap;
-                    } else if (hiddenWrapCooldown > 0) {
-                        if (cursorY + cursorWrap + getWrap(content.get(cursorY), columns) > offsetY + hiddenWrap + rows) {
-                            offsetY = Math.min(offsetY + 1 + tempWrap, content.size());
-                            hiddenWrap += newHiddenWrap;
-                            hiddenWrapCooldown = newHiddenWrap;
-                        } else {
-                            hiddenWrapCooldown--;
-                        }
-                    }
-                }
+                handleArrowDownScroll(content, usedRows, columns);
                 break;
             case TextEditor.ARROW_UP:
-                if (cursorY < offsetY) {
-                    offsetY = Math.max(offsetY - 1, 0);
-                    hiddenWrap -= getWrap(content.get(cursorY), columns);
-                }
+                handleArrowUpScroll(content, columns);
                 break;
             case TextEditor.PAGE_DOWN:
-                /* TODO: implement page down */
+                handlePageDownScroll(content, columns);
                 break;
             case TextEditor.PAGE_UP:
-                /* TODO: implement page up */
+                handlePageUpScroll(content, rows, columns);
                 break;
             default:
         }
     }
 
-    // Moves the cursor based on keypress
-    public void moveCursor(int key, List<String> content, int columns) {
-        switch (key) {
-            case TextEditor.ARROW_UP:
-                if (cursorY > 0) {
-                    cursorY--;
-                    cursorWrap -= getWrap(content.get(cursorY), columns);
+    /**
+     * Handles scrolling logic for ARROW_DOWN key.
+     */
+    private void handleArrowDownScroll(List<String> content, int usedRows, int columns) {
+        if (offsetY - pageWrap + usedRows - 1 < cursorY) {
+            int newContentWrap = getWrap(content.get(cursorY), columns);
+            int newHiddenWrap = getWrap(content.get(offsetY), columns);
+            int tempWrap = 0;
+            
+            // Calculate additional wraps needed to keep cursor in view
+            for (int maxIter = newContentWrap; maxIter > 0; maxIter--) {
+                newHiddenWrap += getWrap(content.get(offsetY + tempWrap + 1), columns);
+                tempWrap++;
+                if (newHiddenWrap >= newContentWrap) {
+                    break;
                 }
+            }
+
+            // Update scroll offset and wraps
+            if (hiddenWrapCooldown <= 0) {
+                offsetY = offsetY + 1 + tempWrap;
+                hiddenWrap += newHiddenWrap;
+                hiddenWrapCooldown = newHiddenWrap;
+            } else if (cursorY + cursorWrap + getWrap(content.get(cursorY), columns) > offsetY + hiddenWrap + usedRows) {
+                offsetY = Math.min(offsetY + 1 + tempWrap, content.size());
+                hiddenWrap += newHiddenWrap;
+            }
+        }
+
+        // Decrement cooldown if active
+        if (hiddenWrapCooldown > 0) {
+            hiddenWrapCooldown--;
+        }
+    }
+
+    /**
+     * Handles scrolling logic for ARROW_UP key.
+     */
+    private void handleArrowUpScroll(List<String> content, int columns) {
+        if (cursorY < offsetY) {
+            offsetY = Math.max(offsetY - 1, 0);
+            hiddenWrap -= getWrap(content.get(cursorY), columns);
+        }
+    }
+
+    /**
+     * Handles scrolling logic for PAGE_DOWN key.
+     */
+    private void handlePageDownScroll(List<String> content, int columns) {
+        int addedHiddenWrap = 0;
+        for (int i = offsetY; i < cursorY; i++) {
+            addedHiddenWrap += getWrap(content.get(i), columns); 
+        }
+        hiddenWrap += addedHiddenWrap;
+        offsetY = cursorY;
+    }
+
+    /**
+     * Handles scrolling logic for PAGE_UP key.
+     */
+    private void handlePageUpScroll(List<String> content, int rows, int columns) {
+        int reducedHiddenWrap = 0;
+        while (offsetY > 0) {
+            offsetY--;
+            reducedHiddenWrap += getWrap(content.get(offsetY), columns);
+            if (cursorY - offsetY + content.get(cursorY).length() / columns + reducedHiddenWrap + 1 > rows) {
+                reducedHiddenWrap -= getWrap(content.get(offsetY), columns);
+                offsetY++;
                 break;
+            }
+        }
+        hiddenWrap -= reducedHiddenWrap;
+    }
+
+    /**
+     * Moves the cursor based on the key pressed.
+     *
+     * @param key      The key code representing the user input.
+     * @param content  The list of text lines in the editor.
+     * @param usedRows The number of rows currently occupied by content.
+     * @param columns  The number of columns in the terminal.
+     */
+    public void moveCursor(int key, List<String> content, int usedRows, int columns) {
+
+        if (content.isEmpty()) {
+            return;
+        }
+
+        int prevCursorY = cursorY;
+
+        switch (key) {
             case TextEditor.ARROW_DOWN:
-                if (cursorY < content.size() - 1) {
-                    cursorWrap += getWrap(content.get(cursorY), columns);
-                    cursorY++;
-                }
+                moveCursorDown(content, columns);
+                break;
+            case TextEditor.ARROW_UP:
+                moveCursorUp(content, columns);
                 break;
             case TextEditor.PAGE_DOWN:
-                /* TODO: implement page down */
+                moveCursorPageDown(content, usedRows);
+                handlePageScrollCursorWrap(cursorY, prevCursorY, content, columns);
                 break;
             case TextEditor.PAGE_UP:
-                /* TODO: implement page up */
+                moveCursorPageUp(content);
+                handlePageScrollCursorWrap(cursorY, prevCursorY, content, columns);
                 break;
             case TextEditor.ARROW_LEFT:
-                /* TODO: implement cursorX limit and wrapping logic */
-                if (cursorX > 0) {
-                    cursorX--;
-                }
+                moveCursorLeft();
                 break;
             case TextEditor.ARROW_RIGHT:
-                /* TODO: implement cursorX limit and wrapping logic */
-                if (cursorX < columns - 1) {
-                    cursorX++;
-                }
+                moveCursorRight(content);
                 break;
             case TextEditor.HOME:
-                /* TODO: implement cursorX limit and wrapping logic */
-                cursorX = 0;
+                moveCursorHome();
                 break;
             case TextEditor.END:
-                /* TODO: implement cursorX limit and wrapping logic */
-                cursorX = columns - 1;
+                moveCursorEnd(content);
                 break;
             case TextEditor.DEL:
-                /* TODO: implemente delete */
+                moveCursorDel(content);
                 break;
+            default:
+        }
+        // Ensure cursorX stays within valid bounds
+        cursorX = Math.min(cursorXcache, Math.max(content.get(cursorY).length() - 1, 0));
+    }
+
+    /**
+     * Moves the cursor down one line.
+     */
+    private void moveCursorDown(List<String> content, int columns) {
+        if (cursorY < content.size() - 1) {
+            cursorWrap += getWrap(content.get(cursorY), columns);
+            cursorY++;
         }
     }
 
-    // Change content of the file based on keypress
-    public void editContent(int key) {
+    /**
+     * Moves the cursor up one line.
+     */
+    private void moveCursorUp(List<String> content, int columns) {
+        if (cursorY > 0) {
+            cursorY--;
+            cursorWrap -= getWrap(content.get(cursorY), columns);
+        }
+    }
+
+    /**
+     * Moves the cursor for PAGE_DOWN key.
+     */
+    private void moveCursorPageDown(List<String> content, int usedRows) {
+        if (offsetY + usedRows - pageWrap == content.size()) {
+            cursorY = offsetY + usedRows - pageWrap - 1;
+        } else {
+            cursorY = offsetY + usedRows - pageWrap - PAGE_SCROLL_OFFSET;
+        }
+    }
+
+    /**
+     * Moves the cursor for PAGE_UP key.
+     */
+    private void moveCursorPageUp(List<String> content) {
+        if (offsetY == 0) {
+            cursorY = offsetY;
+        } else if (offsetY == content.size() - 1) {
+            cursorY = offsetY - 1;
+        } else {
+            cursorY = offsetY + PAGE_SCROLL_OFFSET - 1;
+        }
+    }
+
+    /**
+     * Moves the cursor left one character.
+     */
+    private void moveCursorLeft() {
+        if (cursorX > 0) {
+            cursorX--;
+            cursorXcache = cursorX;
+        }
+    }
+
+    /**
+     * Moves the cursor right one character.
+     */
+    private void moveCursorRight(List<String> content) {
+        if (cursorX < content.get(cursorY).length() - 1) {
+            cursorX++;
+            cursorXcache = cursorX;
+        }
+    }
+
+    /**
+     * Moves the cursor for HOME key.
+     */
+    private void moveCursorHome() {
+        cursorX = 0;
+        cursorXcache = cursorX;
+    }
+
+    /**
+     * Moves the cursor for END key.
+     */
+    private void moveCursorEnd(List<String> content) {
+        cursorX = content.get(cursorY).length() - 1;
+        cursorXcache = cursorX;
+    }
+
+    /**
+     * Moves the cursor when delete one character.
+     */
+    private void moveCursorDel(List<String> content) {
+        cursorX = Math.min(cursorX, Math.max(content.get(cursorY).length() -  1, 0));
+        cursorXcache = cursorX;
+    }
+
+    /**
+     * Updates cursor wrap count when scrolling pages.
+     */
+    private void handlePageScrollCursorWrap(int cursorY, int prevCursorY, List<String> content, int columns) {
+        int addedCursorWrap= 0;
+        for (int i = cursorY; i < prevCursorY; i++) {
+            addedCursorWrap -= getWrap(content.get(i), columns);
+        }
+        for (int i = prevCursorY; i < cursorY; i++) {
+            addedCursorWrap += getWrap(content.get(i), columns);
+        }
+        cursorWrap += addedCursorWrap;
+    }
+
+    /**
+     * Edits the content based on the key pressed (e.g., delete character).
+     *
+     * @param key     The key code representing the user input.
+     * @param content The list of text lines in the editor.
+     */
+    public void editContent(int key, List<String> content) {
         switch (key) {
             case TextEditor.DEL:
-                /* TODO: implemente delete */
+                if (content.get(cursorY).length() > 0) {
+                    content.set(cursorY, String.join("", content.get(cursorY).substring(0, cursorX), content.get(cursorY).substring(cursorX + 1)));
+                }
                 break;
         }
     }
 
-    // Calculates line wrapping based on terminal width
+    /**
+     * Calculates the number of line wraps for a given line based on terminal width.
+     *
+     * @param line    The text line to calculate wrapping for.
+     * @param columns The number of columns in the terminal.
+     * @return The number of wraps needed for the line.
+     */
     public int getWrap(String line, int columns) {
         return Math.max(line.length() - 1, 0) / columns;
     }
 
+    // Getters
     public int getCursorX() {
         return cursorX;
     }
@@ -136,19 +341,20 @@ public class Cursor {
         return pageWrap;
     }
 
-    public void addPageWrap(int wrap) {
-        pageWrap += wrap;
-    }
-
-    public void resetPageWrap() {
-        pageWrap = 0;
-    }
-
     public int getHiddenWrap() {
         return hiddenWrap;
     }
 
     public int getHiddenWrapCooldown() {
         return hiddenWrapCooldown;
+    }
+
+    // Setters
+    public void addPageWrap(int wrap) {
+        pageWrap += wrap;
+    }
+
+    public void resetPageWrap() {
+        pageWrap = 0;
     }
 }
