@@ -15,14 +15,15 @@ mvn exec:java -Dexec.args="filename"
 ## Features
 
 Line-based navigation: View text files with a Vim-like interface.
-Scroll vertically: Use arrow-up and arrow-down keys (supports text wrapping).
-Scroll horizontally: Use arrow-left and arrow-right keys (limit and wrapping functionality are in development).
+Scroll vertically: Arrow-up and arrow-down keys (supports text wrapping), page-up and page-down.
+Scroll horizontally: Use arrow-left and arrow-right keys
+Del: delete one character at a time
 Exit: Press q to quit.
 
 ## Planned Features
 
-Implement horizontal scroll limits and wrapping.
-Add basic editing and saving capabilities.
+- Add basic editing and saving capabilities.
+- Add display tab as a character capability.
 
 ## Notes
 
