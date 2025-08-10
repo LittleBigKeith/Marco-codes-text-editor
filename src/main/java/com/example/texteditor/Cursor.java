@@ -19,6 +19,8 @@ public class Cursor {
     private int hiddenWrap;     // Hidden line wraps due to scrolling
     private int hiddenWrapCooldown; // Cooldown for hidden wrap updates
 
+    private boolean whichWrapEnabled = true;
+
     /**
      * Constructs a new Cursor with initialized position and scroll state.
      */
@@ -147,7 +149,7 @@ public class Cursor {
      * @param usedRows The number of rows currently occupied by content.
      * @param columns  The number of columns in the terminal.
      */
-    public void moveCursor(int key, List<String> content, int usedRows, int columns) {
+    public void moveCursor(int key, TextEditor textEditor, List<String> content, int usedRows, int columns) {
 
         if (content.isEmpty()) {
             return;
@@ -171,10 +173,10 @@ public class Cursor {
                 handlePageScrollCursorWrap(cursorY, prevCursorY, content, columns);
                 break;
             case TextEditor.ARROW_LEFT:
-                moveCursorLeft();
+                moveCursorLeft(textEditor);
                 break;
             case TextEditor.ARROW_RIGHT:
-                moveCursorRight(content);
+                moveCursorRight(textEditor, content);
                 break;
             case TextEditor.HOME:
                 moveCursorHome();
@@ -238,20 +240,26 @@ public class Cursor {
     /**
      * Moves the cursor left one character.
      */
-    private void moveCursorLeft() {
+    private void moveCursorLeft(TextEditor textEditor) {
         if (cursorX > 0) {
             cursorX--;
             cursorXcache = cursorX;
+        } else if (whichWrapEnabled && cursorY > 0) {
+            textEditor.moveCursorAndScroll(TextEditor.ARROW_UP);
+            textEditor.moveCursorAndScroll(TextEditor.END);
         }
     }
 
     /**
      * Moves the cursor right one character.
      */
-    private void moveCursorRight(List<String> content) {
+    private void moveCursorRight(TextEditor textEditor, List<String> content) {
         if (cursorX < content.get(cursorY).length() - 1) {
             cursorX++;
             cursorXcache = cursorX;
+        } else if (whichWrapEnabled && cursorY < content.size() - 1) {
+            textEditor.moveCursorAndScroll(TextEditor.ARROW_DOWN);
+            textEditor.moveCursorAndScroll(TextEditor.HOME);
         }
     }
 

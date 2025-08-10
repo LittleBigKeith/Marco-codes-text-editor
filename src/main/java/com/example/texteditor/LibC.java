@@ -3,6 +3,7 @@ package com.example.texteditor;
 import java.util.Arrays;
 
 import com.sun.jna.Library;
+import com.sun.jna.Platform;
 import com.sun.jna.Structure;
 
 /**
@@ -10,8 +11,9 @@ import com.sun.jna.Structure;
  */
 interface LibC extends Library {
     
+    LibC INSTANCE = com.sun.jna.Native.load("c", LibC.class);
+
     static final int SYSTEM_OUT_FD = 1;
-    
     // Terminal flags
     static final int ISIG = 0x00000080;
     static final int ICANON = 0x00000100;
@@ -23,8 +25,7 @@ interface LibC extends Library {
     static final int OPOST = 0x00000001;
     static final int VMIN = 16;
     static final int VTIME = 17;
-    static final long TIOCGWINSZ = Ioccom._IOR('t', 104);
-    LibC INSTANCE = com.sun.jna.Native.load("c", LibC.class);
+    static final long TIOCGWINSZ = Platform.isMac()? Ioccom._IOR('t', 104) : 0x5413;
 
     /**
      * Represents the terminal window size structure.

@@ -3,6 +3,8 @@ package com.example.texteditor;
 import java.util.Arrays;
 import java.util.List;
 
+import com.sun.jna.Platform;
+
 /**
  * Main class for a terminal-based text editor.
  * Coordinates file handling, terminal operations, and cursor movement.
@@ -29,7 +31,7 @@ public class TextEditor {
      * Constructs a new TextEditor instance.
      */
     public TextEditor() {
-        this.terminal = new Terminal();
+        this.terminal = (Platform.isMac() || Platform.isLinux()) ? new UnixBasedTerminal() : new WindowsTerminal();
         this.fileHandler = new FileHandler();
         this.cursor = new Cursor();
         this.content = Arrays.asList();
@@ -58,10 +60,15 @@ public class TextEditor {
         terminal.initWindowSize();
 
         while (true) {
-            cursor.scroll(keyPressed, content, terminal.getRows(), terminal.getUsedRows(), terminal.getColumns());
             terminal.refreshScreen(content, cursor);
             keyPressed = terminal.getKey();
-            terminal.handleKey(keyPressed, cursor, content);
+            terminal.handleTerminalAction(keyPressed);
+            moveCursorAndScroll(keyPressed);
         }     
+    }
+
+    public void moveCursorAndScroll(int key) {
+        terminal.handleKey(key, this, cursor, content);
+        cursor.scroll(key, content, terminal.getRows(), terminal.getUsedRows(), terminal.getColumns());
     }
 }
