@@ -74,7 +74,6 @@ public class UnixBasedTerminal extends IOHandler implements Terminal {
     /**
      * Exits the editor and restores original terminal settings.
      */
-    // Exits the editor and restores terminal settings
     @Override
     public void exit() {
         System.out.print("\033[2J");    // Clear the screen
@@ -83,6 +82,9 @@ public class UnixBasedTerminal extends IOHandler implements Terminal {
         System.exit(0);
     }
 
+    /**
+     * Update status bar message and refresh terminal screen.
+     */ 
     public void updateStatusBarMessage(StringBuilder builder, Cursor cursor, List<String> content) {
         super.setStatusBarMessage(builder);
         refreshScreen(content, cursor);

@@ -137,6 +137,9 @@ public class WindowsTerminal extends IOHandler implements Terminal {
         System.exit(0);
     }
 
+    /**
+     * Update status bar message and refresh terminal screen.
+     */ 
     public void updateStatusBarMessage(StringBuilder builder, Cursor cursor, List<String> content) {
         super.setStatusBarMessage(builder);
         refreshScreen(content, cursor);
