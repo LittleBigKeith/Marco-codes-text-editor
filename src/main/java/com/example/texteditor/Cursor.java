@@ -63,6 +63,9 @@ public class Cursor {
             case TextEditor.PAGE_UP:
                 handlePageUpScroll(content, rows, columns);
                 break;
+            case TextEditor.FIND:
+                handleFindScroll(content, columns);
+                break;
             default:
         }
     }
@@ -141,6 +144,19 @@ public class Cursor {
         hiddenWrap -= reducedHiddenWrap;
     }
 
+    private void handleFindScroll(List<String> content, int columns) {
+        if (offsetY < cursorY) {
+            handlePageDownScroll(content, columns);
+        } else {
+            int reducedHiddenWrap = 0;
+            for (int i = cursorY; i < offsetY; i++) {
+                reducedHiddenWrap += getWrap(content.get(i), columns);
+            }
+            hiddenWrap -= reducedHiddenWrap;
+            offsetY = cursorY;
+        }
+    }
+
     /**
      * Moves the cursor based on the key pressed.
      *
@@ -149,7 +165,7 @@ public class Cursor {
      * @param usedRows The number of rows currently occupied by content.
      * @param columns  The number of columns in the terminal.
      */
-    public void moveCursor(int key, TextEditor textEditor, List<String> content, int usedRows, int columns) {
+    public void moveCursor(int key, List<String> content, IOHandler terminal, int usedRows, int columns) {
 
         if (content.isEmpty()) {
             return;
@@ -159,24 +175,22 @@ public class Cursor {
 
         switch (key) {
             case TextEditor.ARROW_DOWN:
-                moveCursorDown(content, columns);
+                moveCursorDown(prevCursorY, content, columns);
                 break;
             case TextEditor.ARROW_UP:
-                moveCursorUp(content, columns);
+                moveCursorUp(prevCursorY, content, columns);
                 break;
             case TextEditor.PAGE_DOWN:
-                moveCursorPageDown(content, usedRows);
-                handlePageScrollCursorWrap(cursorY, prevCursorY, content, columns);
+                moveCursorPageDown(prevCursorY, content, usedRows, columns);
                 break;
             case TextEditor.PAGE_UP:
-                moveCursorPageUp(content);
-                handlePageScrollCursorWrap(cursorY, prevCursorY, content, columns);
+                moveCursorPageUp(prevCursorY, content, columns);
                 break;
             case TextEditor.ARROW_LEFT:
-                moveCursorLeft(textEditor);
+                moveCursorLeft(content, terminal);
                 break;
             case TextEditor.ARROW_RIGHT:
-                moveCursorRight(textEditor, content);
+                moveCursorRight(content, terminal);
                 break;
             case TextEditor.HOME:
                 moveCursorHome();
@@ -187,47 +201,64 @@ public class Cursor {
             case TextEditor.DEL:
                 moveCursorDel(content);
                 break;
+            case TextEditor.BACKSPACE:
+                moveCursorBackspace(content);
             default:
         }
         // Ensure cursorX stays within valid bounds
         cursorX = Math.min(cursorXcache, Math.max(content.get(cursorY).length() - 1, 0));
     }
 
+    public void moveCursor(int key, List<String> content, IOHandler ioHandler, int usedRows, int columns, int targetRow, int targetCol) {
+        if (content.isEmpty()) {
+            return;
+        }
+
+        int prevCursorY = cursorY;
+
+        cursorY = targetRow;
+        handleCursorWrap(prevCursorY, content, columns);
+
+        cursorX = targetCol;
+        cursorXcache = cursorX;
+    }
+
     /**
      * Moves the cursor down one line.
      */
-    private void moveCursorDown(List<String> content, int columns) {
+    private void moveCursorDown(int prevCursorY, List<String> content, int columns) {
         if (cursorY < content.size() - 1) {
-            cursorWrap += getWrap(content.get(cursorY), columns);
             cursorY++;
+            handleCursorWrap(prevCursorY, content, columns);
         }
     }
 
     /**
      * Moves the cursor up one line.
      */
-    private void moveCursorUp(List<String> content, int columns) {
+    private void moveCursorUp(int prevCursorY, List<String> content, int columns) {
         if (cursorY > 0) {
             cursorY--;
-            cursorWrap -= getWrap(content.get(cursorY), columns);
+            handleCursorWrap(prevCursorY, content, columns);
         }
     }
 
     /**
      * Moves the cursor for PAGE_DOWN key.
      */
-    private void moveCursorPageDown(List<String> content, int usedRows) {
+    private void moveCursorPageDown(int prevCursorY, List<String> content, int usedRows, int columns) {
         if (offsetY + usedRows - pageWrap == content.size()) {
             cursorY = offsetY + usedRows - pageWrap - 1;
         } else {
             cursorY = offsetY + usedRows - pageWrap - PAGE_SCROLL_OFFSET;
         }
+        handleCursorWrap(prevCursorY, content, columns);
     }
 
     /**
      * Moves the cursor for PAGE_UP key.
      */
-    private void moveCursorPageUp(List<String> content) {
+    private void moveCursorPageUp(int prevCursorY, List<String> content, int columns) {
         if (offsetY == 0) {
             cursorY = offsetY;
         } else if (offsetY == content.size() - 1) {
@@ -235,31 +266,32 @@ public class Cursor {
         } else {
             cursorY = offsetY + PAGE_SCROLL_OFFSET - 1;
         }
+        handleCursorWrap(prevCursorY, content, columns);
     }
 
     /**
      * Moves the cursor left one character.
      */
-    private void moveCursorLeft(TextEditor textEditor) {
+    private void moveCursorLeft(List<String> content, IOHandler terminal) {
         if (cursorX > 0) {
             cursorX--;
             cursorXcache = cursorX;
         } else if (whichWrapEnabled && cursorY > 0) {
-            textEditor.moveCursorAndScroll(TextEditor.ARROW_UP);
-            textEditor.moveCursorAndScroll(TextEditor.END);
+            terminal.handleKey(TextEditor.ARROW_UP, this, content);
+            terminal.handleKey(TextEditor.END, this, content);
         }
     }
 
     /**
      * Moves the cursor right one character.
      */
-    private void moveCursorRight(TextEditor textEditor, List<String> content) {
+    private void moveCursorRight(List<String> content, IOHandler terminal) {
         if (cursorX < content.get(cursorY).length() - 1) {
             cursorX++;
             cursorXcache = cursorX;
         } else if (whichWrapEnabled && cursorY < content.size() - 1) {
-            textEditor.moveCursorAndScroll(TextEditor.ARROW_DOWN);
-            textEditor.moveCursorAndScroll(TextEditor.HOME);
+            terminal.handleKey(TextEditor.ARROW_DOWN, this, content);
+            terminal.handleKey(TextEditor.HOME, this, content);
         }
     }
 
@@ -287,10 +319,15 @@ public class Cursor {
         cursorXcache = cursorX;
     }
 
+    private void moveCursorBackspace(List<String> content) {
+        cursorX = Math.max(cursorX - 1, 0);
+        cursorXcache = cursorX;
+    }
+
     /**
      * Updates cursor wrap count when scrolling pages.
      */
-    private void handlePageScrollCursorWrap(int cursorY, int prevCursorY, List<String> content, int columns) {
+    private void handleCursorWrap(int prevCursorY, List<String> content, int columns) {
         int addedCursorWrap= 0;
         for (int i = cursorY; i < prevCursorY; i++) {
             addedCursorWrap -= getWrap(content.get(i), columns);
@@ -308,12 +345,22 @@ public class Cursor {
      * @param content The list of text lines in the editor.
      */
     public void editContent(int key, List<String> content) {
+        if (content.size() <= 0) {
+            return;
+        }
+
         switch (key) {
             case TextEditor.DEL:
                 if (content.get(cursorY).length() > 0) {
                     content.set(cursorY, String.join("", content.get(cursorY).substring(0, cursorX), content.get(cursorY).substring(cursorX + 1)));
                 }
                 break;
+            case TextEditor.BACKSPACE:
+                if (content.get(cursorY).length() > 0) {
+                    content.set(cursorY, String.join("", content.get(cursorY).substring(0, Math.max(cursorX - 1, 0)), content.get(cursorY).substring(cursorX)));
+                }
+                break;
+            default:
         }
     }
 

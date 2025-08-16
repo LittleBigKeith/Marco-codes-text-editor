@@ -9,6 +9,8 @@ public abstract class IOHandler {
     private int rows, columns;               // Number of rows and columns of the terminal window
     private int usedRows = 0;                // Number of rows occupied by content
 
+    protected String statusBarMessage = new String();
+
     /**
      * Refreshes the terminal screen with content and cursor position.
      *
@@ -56,8 +58,10 @@ public abstract class IOHandler {
      */
     private void drawStatusBar(StringBuilder builder, Cursor cursor) {
         builder.append("\033[7m"); // Set reverse video mode (inverted colors)
-        String statusBar = "R: " + usedRows + " cY: " + cursor.getCursorY() + " oY: " + cursor.getOffsetY() + " pw: " + cursor.getPageWrap() + " cw: " + cursor.getCursorWrap() + " hw: " + cursor.getHiddenWrap() + " cd: " + cursor.getHiddenWrapCooldown();
-        builder.append(statusBar).append(String.join("", Collections.nCopies(Math.max(0, (columns - statusBar.length())), " ")));
+        String statusBarMessage = this.statusBarMessage.isEmpty() ?
+            "R: " + usedRows + " cY: " + cursor.getCursorY() + " oY: " + cursor.getOffsetY() + " pw: " + cursor.getPageWrap() + " cw: " + cursor.getCursorWrap() + " hw: " + cursor.getHiddenWrap() + " cd: " + cursor.getHiddenWrapCooldown() :
+            this.statusBarMessage;
+        builder.append(statusBarMessage).append(String.join("", Collections.nCopies(Math.max(0, (columns - statusBarMessage.length())), " ")));
         builder.append("\033[0m"); // Reset ANSI attributes to normal
     }
 
@@ -75,19 +79,21 @@ public abstract class IOHandler {
      */
     public int getKey() {
         try {
-            int firstByte = System.in.read();
+            ByteBuffer byteBuffer = new ByteBuffer(6);
+            System.in.read(byteBuffer.getBuffer());
+            int firstByte = byteBuffer.next();
 
             if (firstByte != '\033') {
                 return firstByte;
             }
 
-            int secondByte = System.in.read();
+            int secondByte = byteBuffer.next();
 
-            if (secondByte != '[' && secondByte != 'O') {
-                return secondByte;
+            if (secondByte != '[' && secondByte == 0) {
+                return TextEditor.ESC;
             }
 
-            int thirdByte = System.in.read();
+            int thirdByte = byteBuffer.next();
             if (secondByte == '[') {
                 switch (thirdByte) {
                     case 'A': return TextEditor.ARROW_UP;
@@ -97,7 +103,7 @@ public abstract class IOHandler {
                     case 'F': return TextEditor.END;
                     case 'H': return TextEditor.HOME;
                     case '1': case '3': case '4': case '5': case '6': case '7': case '8':
-                        int fourthByte = System.in.read();
+                        int fourthByte = byteBuffer.next();
                         if (fourthByte == '~') {
                             switch (thirdByte) {
                                 case '1': case '7': return TextEditor.HOME;
@@ -107,8 +113,7 @@ public abstract class IOHandler {
                                 case '6': return TextEditor.PAGE_DOWN;
                             }
                         } else if (fourthByte == ';') {
-                            System.in.read(); // Skip modifier
-                            int sixthByte = System.in.read();
+                            int sixthByte = byteBuffer.skip();
                             switch (sixthByte) {
                                 case 'A': return TextEditor.PAGE_UP;
                                 case 'B': return TextEditor.PAGE_DOWN;
@@ -141,9 +146,16 @@ public abstract class IOHandler {
      * @param cursor     The cursor object managing position and scrolling.
      * @param content    The list of text lines in the editor.
      */
-    public void handleKey(int keyPressed, TextEditor textEditor, Cursor cursor, List<String> content) {
+    public void handleKey(int keyPressed, Cursor cursor, List<String> content) {
         cursor.editContent(keyPressed, content);
-        cursor.moveCursor(keyPressed, textEditor, content, usedRows, columns);
+        cursor.moveCursor(keyPressed, content, this, usedRows, columns);
+        cursor.scroll(keyPressed, content, rows, usedRows, columns);
+    }
+
+    public void handleKey(int keyPressed, Cursor cursor, List<String> content, int targetRow, int targetCol) {
+        cursor.editContent(keyPressed, content);
+        cursor.moveCursor(keyPressed, content, this, usedRows, columns, targetRow, targetCol);
+        cursor.scroll(keyPressed, content, rows, usedRows, columns);
     }
 
     // Getters
@@ -168,4 +180,7 @@ public abstract class IOHandler {
         this.columns = cols;
     }
 
+    public void setStatusBarMessage(StringBuilder builder) {
+        this.statusBarMessage = builder.toString();
+    }
 }

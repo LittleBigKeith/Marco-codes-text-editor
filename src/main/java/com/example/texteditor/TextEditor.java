@@ -2,6 +2,7 @@ package com.example.texteditor;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.BiConsumer;
 
 import com.sun.jna.Platform;
 
@@ -10,7 +11,9 @@ import com.sun.jna.Platform;
  * Coordinates file handling, terminal operations, and cursor movement.
  */
 public class TextEditor {
-    
+
+    public static final int ENTER = 13;
+    public static final int BACKSPACE = 127;
     public static final int ARROW_UP = 1000;
     public static final int ARROW_DOWN = 1001;
     public static final int ARROW_LEFT = 1002;
@@ -20,12 +23,21 @@ public class TextEditor {
     public static final int HOME = 1006;
     public static final int END = 1007;
     public static final int DEL = 1008;
-    
+    public static final int FIND = 1009;
+    public static final int ESC = 1010;
+
     private final Terminal terminal;
     private final FileHandler fileHandler;
     private final Cursor cursor;
     private List<String> content;
     private int keyPressed;
+
+    public static final String DEFAULT_FIND_PROMPT = "Find %s (use Arrow/Enter/ESC)";
+    private enum SearchDir {
+        FORWARD, BACKWRAD;
+    }
+    boolean matchFound = false;
+    int matchX = 0, matchY = 0;
 
     /**
      * Constructs a new TextEditor instance.
@@ -62,13 +74,145 @@ public class TextEditor {
         while (true) {
             terminal.refreshScreen(content, cursor);
             keyPressed = terminal.getKey();
-            terminal.handleTerminalAction(keyPressed);
-            moveCursorAndScroll(keyPressed);
+            handleActions(keyPressed);
+            terminal.handleKey(keyPressed, cursor, content);
         }     
     }
 
-    public void moveCursorAndScroll(int key) {
-        terminal.handleKey(key, this, cursor, content);
-        cursor.scroll(key, content, terminal.getRows(), terminal.getUsedRows(), terminal.getColumns());
+    /**
+     * Handles specific key actions like find (Ctrl+F) or quit (Ctrl+Q).
+     *
+     * @param keyPressed The key code of the pressed key.
+     */
+    private void handleActions(int keyPressed) {
+        if (keyPressed == ctrl('f')) {
+            find((defaultMsg, userMsg) -> {
+                StringBuilder builder = new StringBuilder();
+                builder.append(userMsg.isEmpty() ? defaultMsg : userMsg);
+                terminal.updateStatusBarMessage(builder, cursor, content);
+            });
+        } else if (keyPressed == ctrl('q')) {
+            terminal.exit();
+        }
+    }
+
+    /**
+     * Implements the find functionality, allowing the user to input a search string
+     * and navigate matches using arrow keys or Enter.
+     *
+     * @param prompt BiConsumer to update the status bar with the search prompt.
+     */
+    private void find(BiConsumer<String, String> prompt) {
+        StringBuilder builder = new StringBuilder();
+
+        while (true) {
+            prompt.accept(DEFAULT_FIND_PROMPT, builder.toString());
+            int keyRead = terminal.getKey();
+            if (!Character.isISOControl(keyRead) && keyRead < 128) {
+                builder.append((char)keyRead);
+                findStringInText(builder);
+            } else if (keyRead == TextEditor.BACKSPACE || keyRead == TextEditor.DEL) {
+                builder.setLength(Math.max(builder.length() - 1, 0));
+                findStringInText(builder);
+            } else if (keyRead == TextEditor.ENTER || keyRead == TextEditor.ARROW_DOWN || keyRead == TextEditor.ARROW_RIGHT) {
+                findNext(SearchDir.FORWARD, builder);
+            } else if (keyRead == TextEditor.ARROW_UP || keyRead == TextEditor.ARROW_LEFT) {
+                findNext(SearchDir.BACKWRAD, builder);
+            } else if (keyRead == TextEditor.ESC) {
+                escapeFind(builder);
+                break;
+            }
+        }
+    }
+
+    /**
+     * Searches for a string in the content and updates cursor if a match is found.
+     *
+     * @param builder The search string to find.
+     */
+    private void findStringInText (StringBuilder builder) {
+        matchFound = false;
+        String searchString = builder.toString();
+        int i = 0;
+        while (i < content.size()) {
+            String contentLine = content.get(i);
+            if (contentLine.contains(searchString)) {
+                matchFound = true;
+                matchX = contentLine.indexOf(searchString);
+                matchY = i;
+                terminal.handleKey(TextEditor.FIND, cursor, content, matchY, matchX);
+                terminal.refreshScreen(content, cursor);
+                break;
+            }
+            i++;
+        }
+    }
+
+    /**
+     * Finds the next or previous match of the search string in the specified direction.
+     *
+     * @param dir The search direction (FORWARD or BACKWRAD).
+     * @param builder The search string to find.
+     */
+    private void findNext(SearchDir dir, StringBuilder builder) {
+        String searchString = builder.toString();
+        if (!matchFound || content.size() <= 0 || searchString.length() <= 0) {
+            return;
+        }
+        int startY = matchY;
+        int searchY = startY;
+        int startX = matchX;
+        int searchX = startX + (dir == SearchDir.FORWARD ? searchString.length() : -1);
+
+        while (searchY != startY || searchX != startX) {
+            String contentLine = (dir == SearchDir.FORWARD ? content.get(searchY).substring(searchX) : content.get(searchY).substring(0, searchX + 1));
+            int nextMatch = (dir == SearchDir.FORWARD ? contentLine.indexOf(searchString) : contentLine.lastIndexOf(searchString));
+
+            if (nextMatch != -1) {
+                matchY = searchY;
+                matchX = (dir == SearchDir.FORWARD? searchX + nextMatch : nextMatch);
+                terminal.handleKey(TextEditor.FIND, cursor, content, matchY, matchX);
+                terminal.refreshScreen(content, cursor);
+                break;
+            } else {
+                searchY =  wrapSearchY(searchY + (dir == SearchDir.FORWARD ? 1 : -1));
+                searchX = (dir == SearchDir.FORWARD ? 0 : content.get(searchY).length() - 1);
+            }
+        }
+    }
+
+    /**
+     * Wraps the search line index to loop around content boundaries.
+     *
+     * @param searchY The current line index.
+     * @return The wrapped line index.
+     */
+    private int wrapSearchY(int searchY) {
+        if (searchY >= content.size()) {
+            searchY = 0;
+        } else if (searchY < 0) {
+            searchY = content.size() - 1;
+        }
+        return searchY;
+    }
+
+    /**
+     * Clears the search string and updates the status bar when exiting find mode.
+     *
+     * @param builder The search string to clear.
+     */
+    private void escapeFind(StringBuilder builder) {
+        builder.setLength(0);
+        terminal.updateStatusBarMessage(builder, cursor, content);
+    }
+
+    /**
+     * Converts a key to its Ctrl-modified equivalent (e.g., Ctrl+F).
+     *
+     * @param key The key code to modify.
+     * @return The Ctrl-modified key code.
+     */
+    private static int ctrl(int key){
+        return key & 0x1f;
     }
 }

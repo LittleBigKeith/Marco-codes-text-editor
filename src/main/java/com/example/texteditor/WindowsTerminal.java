@@ -1,5 +1,7 @@
 package com.example.texteditor;
 
+import java.util.List;
+
 import com.sun.jna.Pointer;
 import com.sun.jna.ptr.LongByReference;
 
@@ -134,5 +136,9 @@ public class WindowsTerminal extends IOHandler implements Terminal {
         disableRawMode();
         System.exit(0);
     }
-    
+
+    public void updateStatusBarMessage(StringBuilder builder, Cursor cursor, List<String> content) {
+        super.setStatusBarMessage(builder);
+        refreshScreen(content, cursor);
+    }
 }

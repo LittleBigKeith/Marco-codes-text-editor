@@ -1,5 +1,7 @@
 package com.example.texteditor;
 
+import java.util.List;
+
 /**
  * Handles terminal operations, including raw mode configuration, screen rendering, and keypress handling.
  */
@@ -79,5 +81,10 @@ public class UnixBasedTerminal extends IOHandler implements Terminal {
         System.out.print("\033[H");     // Move cursor to top-left
         disableRawMode();
         System.exit(0);
+    }
+
+    public void updateStatusBarMessage(StringBuilder builder, Cursor cursor, List<String> content) {
+        super.setStatusBarMessage(builder);
+        refreshScreen(content, cursor);
     }
 }

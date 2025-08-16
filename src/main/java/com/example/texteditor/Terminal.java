@@ -44,19 +44,14 @@ public interface Terminal {
      * @param cursor     The cursor object managing position and scrolling.
      * @param content    The list of text lines in the editor.
      */
-    void handleKey(int keyPressed, TextEditor textEditor, Cursor cursor, List<String> content);
-
-    default void handleTerminalAction(int keyPressed) {
-        switch (keyPressed) {
-            case 'q':
-                exit();
-                break;
-        }
-    }
+    void handleKey(int keyPressed, Cursor cursor, List<String> content);
+    void handleKey(int keyPressed, Cursor cursor, List<String> content, int targetRow, int targetCol);
 
     // Getters
     int getRows();
     int getUsedRows();
     int getColumns();
 
+    //Setters
+    void updateStatusBarMessage(StringBuilder builder, Cursor cursor, List<String> content);
 }
