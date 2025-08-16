@@ -206,7 +206,7 @@ public class Cursor {
             default:
         }
         // Ensure cursorX stays within valid bounds
-        cursorX = Math.min(cursorXcache, Math.max(content.get(cursorY).length() - 1, 0));
+        cursorX = Math.min(cursorXcache, Math.max(content.get(cursorY).length(), 0));
     }
 
     public void moveCursor(int key, List<String> content, IOHandler ioHandler, int usedRows, int columns, int targetRow, int targetCol) {
@@ -286,7 +286,7 @@ public class Cursor {
      * Moves the cursor right one character.
      */
     private void moveCursorRight(List<String> content, IOHandler terminal) {
-        if (cursorX < content.get(cursorY).length() - 1) {
+        if (cursorX < content.get(cursorY).length()) {
             cursorX++;
             cursorXcache = cursorX;
         } else if (whichWrapEnabled && cursorY < content.size() - 1) {
@@ -307,7 +307,7 @@ public class Cursor {
      * Moves the cursor for END key.
      */
     private void moveCursorEnd(List<String> content) {
-        cursorX = content.get(cursorY).length() - 1;
+        cursorX = content.get(cursorY).length();
         cursorXcache = cursorX;
     }
 
