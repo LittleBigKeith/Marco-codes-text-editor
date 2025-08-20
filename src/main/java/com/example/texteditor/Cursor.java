@@ -38,21 +38,21 @@ public class Cursor {
     /**
      * Handles scrolling based on cursor movement and key input.
      *
-     * @param keyPressed The key code representing the user input.
+     * @param key The key code representing the user input.
      * @param content    The list of text lines in the editor.
      * @param rows       The number of visible rows in the terminal.
      * @param usedRows   The number of rows currently occupied by content.
      * @param columns    The number of columns in the terminal.
      */
-    public void scroll(int keyPressed, List<String> content, int rows, int usedRows, int columns) {
+    public void scroll(int key, List<String> content, int rows, int usedRows, int columns) {
 
         if (content.size() <= 0) {
             return;
         }
 
-        switch(keyPressed) {
+        switch(key) {
             case TextEditor.ARROW_DOWN:
-                handleArrowDownScroll(content, usedRows, columns);
+                handleArrowDownScroll(content, rows, usedRows, columns);
                 break;
             case TextEditor.ARROW_UP:
                 handleArrowUpScroll(content, columns);
@@ -67,25 +67,29 @@ public class Cursor {
                 handleFindScroll(content, columns);
                 break;
             default:
+                if (!Character.isISOControl(key) && key < 128) {
+                    handleInsertCharScroll(content, rows, columns);
+                }
         }
     }
 
     /**
      * Handles scrolling logic for ARROW_DOWN key.
      */
-    private void handleArrowDownScroll(List<String> content, int usedRows, int columns) {
+    private void handleArrowDownScroll(List<String> content, int rows, int usedRows, int columns) {
         if (offsetY - pageWrap + usedRows - 1 < cursorY) {
             int newContentWrap = getWrap(content.get(cursorY), columns);
             int newHiddenWrap = getWrap(content.get(offsetY), columns);
+            int unusedRows = rows - usedRows;
             int tempWrap = 0;
             
             // Calculate additional wraps needed to keep cursor in view
             for (int maxIter = newContentWrap; maxIter > 0; maxIter--) {
-                newHiddenWrap += getWrap(content.get(offsetY + tempWrap + 1), columns);
-                tempWrap++;
-                if (newHiddenWrap >= newContentWrap) {
+                if (newHiddenWrap + tempWrap + 1 + unusedRows >= newContentWrap) {
                     break;
                 }
+                newHiddenWrap += getWrap(content.get(offsetY + tempWrap + 1), columns);
+                tempWrap++;
             }
 
             // Update scroll offset and wraps
@@ -93,15 +97,22 @@ public class Cursor {
                 offsetY = offsetY + 1 + tempWrap;
                 hiddenWrap += newHiddenWrap;
                 hiddenWrapCooldown = newHiddenWrap;
-            } else if (cursorY + cursorWrap + getWrap(content.get(cursorY), columns) > offsetY + hiddenWrap + usedRows) {
-                offsetY = Math.min(offsetY + 1 + tempWrap, content.size());
+            } else if (cursorY + cursorWrap + getWrap(content.get(cursorY), columns) > offsetY + hiddenWrap + rows) {
                 hiddenWrap += newHiddenWrap;
+                offsetY = Math.min(offsetY + 1 + tempWrap, content.size());
             }
         }
 
         // Decrement cooldown if active
         if (hiddenWrapCooldown > 0) {
             hiddenWrapCooldown--;
+        }
+    }
+
+    private void handleInsertCharScroll(List<String> content, int rows, int columns) {
+        if (cursorY + cursorWrap + getWrap(content.get(cursorY), columns) > offsetY + hiddenWrap + rows) {
+            hiddenWrap += getWrap(content.get(offsetY), columns);
+            offsetY = Math.min(offsetY + 1, content.size());
         }
     }
 
@@ -202,8 +213,11 @@ public class Cursor {
                 moveCursorDel(content);
                 break;
             case TextEditor.BACKSPACE:
-                moveCursorBackspace(content);
+                moveCursorBackspace();
             default:
+                if (!Character.isISOControl(key) && key < 128) {
+                    moveCursorInsertChar();
+                }
         }
         // Ensure cursorX stays within valid bounds
         cursorX = Math.min(cursorXcache, Math.max(content.get(cursorY).length(), 0));
@@ -319,8 +333,13 @@ public class Cursor {
         cursorXcache = cursorX;
     }
 
-    private void moveCursorBackspace(List<String> content) {
+    private void moveCursorBackspace() {
         cursorX = Math.max(cursorX - 1, 0);
+        cursorXcache = cursorX;
+    }
+
+    private void moveCursorInsertChar() {
+        cursorX += 1;
         cursorXcache = cursorX;
     }
 
@@ -361,7 +380,11 @@ public class Cursor {
                 }
                 break;
             default:
+                if (!Character.isISOControl(key) && key < 128) {
+                    content.set(cursorY, String.join("", content.get(cursorY).substring(0, cursorX), String.valueOf((char)key), content.get(cursorY).substring(cursorX)));
+                }
         }
+
     }
 
     /**
