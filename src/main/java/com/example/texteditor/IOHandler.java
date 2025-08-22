@@ -149,13 +149,13 @@ public abstract class IOHandler {
     public void handleKey(int keyPressed, Cursor cursor, List<String> content) {
         cursor.editContent(keyPressed, content);
         cursor.moveCursor(keyPressed, content, this, usedRows, columns);
-        cursor.scroll(keyPressed, content, rows, usedRows, columns);
+        cursor.scroll(keyPressed, content, rows, columns);
     }
 
     public void handleKey(int keyPressed, Cursor cursor, List<String> content, int targetRow, int targetCol) {
         cursor.editContent(keyPressed, content);
         cursor.moveCursor(keyPressed, content, this, usedRows, columns, targetRow, targetCol);
-        cursor.scroll(keyPressed, content, rows, usedRows, columns);
+        cursor.scroll(keyPressed, content, rows, columns);
     }
 
     // Getters
