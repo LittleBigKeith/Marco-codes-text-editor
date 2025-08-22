@@ -109,6 +109,9 @@ public class Cursor {
         }
     }
 
+    /**
+     * Handles scrolling logic for inserting a character.
+     */
     private void handleInsertCharScroll(List<String> content, int rows, int columns) {
         if (cursorY + cursorWrap + getWrap(content.get(cursorY), columns) > offsetY + hiddenWrap + rows) {
             hiddenWrap += getWrap(content.get(offsetY), columns);
@@ -155,6 +158,9 @@ public class Cursor {
         hiddenWrap -= reducedHiddenWrap;
     }
 
+    /**
+     * Handles scrolling logic for find function.
+     */
     private void handleFindScroll(List<String> content, int columns) {
         if (offsetY < cursorY) {
             handlePageDownScroll(content, columns);
@@ -333,11 +339,17 @@ public class Cursor {
         cursorXcache = cursorX;
     }
 
+    /**
+     * Moves the cursor for backspace key.
+     */
     private void moveCursorBackspace() {
         cursorX = Math.max(cursorX - 1, 0);
         cursorXcache = cursorX;
     }
 
+    /**
+     * Moves the cursor when insert one character.
+     */
     private void moveCursorInsertChar() {
         cursorX += 1;
         cursorXcache = cursorX;

@@ -32,23 +32,28 @@ public class FileHandler {
      * @throws IllegalArgumentException if the filename is invalid or not provided.
      */
     public void openFile(String[] args) {
-        if (args.length != 1) {
-            System.out.println("Usage: mvn exec:java -Dexec.args=\"<filename>\"");
+        if (args.length > 1) {
+            System.out.println("Usage: mvn exec:java [-Dexec.args=\"<filename>\"]");
             return;
         }
-            
-        String filename = args[0].replace("~", System.getProperty("user.home"));;
-        Path path = Paths.get(filename);
+        
+        if (args.length == 1) {
+            String filename = args[0].replace("~", System.getProperty("user.home"));;
+            Path path = Paths.get(filename);
 
-        if (!Files.exists(path)) {
-            System.err.println("Error: File '" + filename + "' does not exist.");
-            return;
-        }
+            if (!Files.exists(path)) {
+                System.err.println("Error: File '" + filename + "' does not exist.");
+                System.exit(-1);
+            }
 
-        try (Stream<String> stream = Files.lines(path)){
-            content = stream.collect(Collectors.toList());
-        } catch (IOException e) {
-            System.err.println("Error reading file '" + filename + "': " + e.getMessage());
+            try (Stream<String> stream = Files.lines(path)){
+                content = stream.collect(Collectors.toList());
+            } catch (IOException e) {
+                System.err.println("Error reading file '" + filename + "': " + e.getMessage());
+            }
+        } else {
+            content = new ArrayList<>();
+            content.add("");
         }
     }
     
