@@ -79,6 +79,10 @@ public class Cursor {
      * Handles scrolling logic for ARROW_DOWN key.
      */
     private void handleArrowDownScroll(List<String> content, int rows, int columns) {
+        moveCursorIntoView(content, rows, columns);
+    }
+
+    private void moveCursorIntoView(List<String> content, int rows, int columns) {
         while (cursorY + cursorWrap + getWrap(content.get(cursorY), columns) > offsetY + hiddenWrap + rows) {
             hiddenWrap += getWrap(content.get(offsetY), columns);
             offsetY = Math.min(offsetY + 1, content.size());
@@ -156,10 +160,7 @@ public class Cursor {
     }
 
     private void handleDelScroll(List<String> content, int rows, int columns) {
-        while (cursorY + cursorWrap + getWrap(content.get(cursorY), columns) > offsetY + hiddenWrap + rows) {
-            hiddenWrap += getWrap(content.get(offsetY), columns);
-            offsetY = Math.min(offsetY + 1, content.size());
-        }
+        moveCursorIntoView(content, rows, columns);
     }
 
     private void handleBackspaceScroll(List<String> content, int columns) {
