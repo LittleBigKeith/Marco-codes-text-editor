@@ -59,7 +59,7 @@ public abstract class IOHandler {
     private void drawStatusBar(StringBuilder builder, Cursor cursor) {
         builder.append("\033[7m"); // Set reverse video mode (inverted colors)
         String statusBarMessage = this.statusBarMessage.isEmpty() ?
-            "R: " + usedRows + " cY: " + cursor.getCursorY() + " oY: " + cursor.getOffsetY() + " pw: " + cursor.getPageWrap() + " cw: " + cursor.getCursorWrap() + " hw: " + cursor.getHiddenWrap() + " cd: " + cursor.getHiddenWrapCooldown() :
+            "R: " + usedRows + " cY: " + cursor.getCursorY() + " oY: " + cursor.getOffsetY() + " pw: " + cursor.getPageWrap() + " cw: " + cursor.getCursorWrap() + " hw: " + cursor.getHiddenWrap() :
             this.statusBarMessage;
         builder.append(statusBarMessage).append(String.join("", Collections.nCopies(Math.max(0, (columns - statusBarMessage.length())), " ")));
         builder.append("\033[0m"); // Reset ANSI attributes to normal

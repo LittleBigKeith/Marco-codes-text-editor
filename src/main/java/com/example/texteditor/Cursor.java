@@ -17,9 +17,6 @@ public class Cursor {
     private int cursorWrap;     // Accumulated line wraps for the cursor
     private int pageWrap;       // Accumulated line wraps for the page
     private int hiddenWrap;     // Hidden line wraps due to scrolling
-    private int hiddenWrapCooldown; // Cooldown for hidden wrap updates
-
-    private boolean whichWrapEnabled = true;
 
     /**
      * Constructs a new Cursor with initialized position and scroll state.
@@ -32,7 +29,6 @@ public class Cursor {
         this.cursorWrap = 0;
         this.pageWrap = 0;
         this.hiddenWrap = 0;
-        this.hiddenWrapCooldown = 0;
     }
 
     /**
@@ -296,7 +292,7 @@ public class Cursor {
         if (cursorX > 0) {
             cursorX--;
             cursorXcache = cursorX;
-        } else if (whichWrapEnabled && cursorY > 0) {
+        } else if (cursorY > 0) {
             terminal.handleKey(TextEditor.ARROW_UP, this, content);
             terminal.handleKey(TextEditor.END, this, content);
         }
@@ -309,7 +305,7 @@ public class Cursor {
         if (cursorX < content.get(cursorY).length()) {
             cursorX++;
             cursorXcache = cursorX;
-        } else if (whichWrapEnabled && cursorY < content.size() - 1) {
+        } else if (cursorY < content.size() - 1) {
             terminal.handleKey(TextEditor.ARROW_DOWN, this, content);
             terminal.handleKey(TextEditor.HOME, this, content);
         }
@@ -465,10 +461,6 @@ public class Cursor {
 
     public int getHiddenWrap() {
         return hiddenWrap;
-    }
-
-    public int getHiddenWrapCooldown() {
-        return hiddenWrapCooldown;
     }
 
     // Setters
