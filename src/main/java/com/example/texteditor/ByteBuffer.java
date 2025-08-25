@@ -1,5 +1,7 @@
 package com.example.texteditor;
 
+import java.util.Arrays;
+
 public class ByteBuffer {
 
     private byte[] byteBuffer;
@@ -22,6 +24,10 @@ public class ByteBuffer {
     public int skip() {
         index += 1;
         return next();
+    }
+
+    public void clear() {
+        Arrays.fill(byteBuffer, (byte) 0);
     }
 
     public byte[] getBuffer() {
