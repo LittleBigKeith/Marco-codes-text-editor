@@ -9,7 +9,8 @@ public abstract class IOHandler {
     private int rows, columns;               // Number of rows and columns of the terminal window
     private int usedRows = 0;                // Number of rows occupied by content
 
-    protected String statusBarMessage = new String();
+    private String statusBarMessage = new String();
+    private int statusBarTextColor = 30;
 
     /**
      * Refreshes the terminal screen with content and cursor position.
@@ -18,6 +19,15 @@ public abstract class IOHandler {
      * @param cursor  The cursor object managing position and scrolling.
      */
     public void refreshScreen(List<String> content, Cursor cursor) {
+        drawScreen(content, cursor);
+    }
+
+    public void refreshScreen(List<String> content, Cursor cursor, int textColor) {
+        statusBarTextColor = textColor;
+        drawScreen(content, cursor);
+    }
+
+    public void drawScreen(List<String> content, Cursor cursor) {
         StringBuilder builder = new StringBuilder();
         drawContent(builder, content, cursor);
         drawStatusBar(builder, cursor);
@@ -57,7 +67,13 @@ public abstract class IOHandler {
      * Draws the status bar with editor information.
      */
     private void drawStatusBar(StringBuilder builder, Cursor cursor) {
-        builder.append("\033[7m"); // Set reverse video mode (inverted colors)
+        builder.append("\033[47;");
+        builder.append(statusBarTextColor);
+        builder.append("m");
+        drawStatusBarMessage(builder, cursor);
+    }
+
+    private void drawStatusBarMessage(StringBuilder builder, Cursor cursor) {
         String statusBarMessage = this.statusBarMessage.isEmpty() ?
             "R: " + usedRows + " cY: " + cursor.getCursorY() + " oY: " + cursor.getOffsetY() + " pw: " + cursor.getPageWrap() + " cw: " + cursor.getCursorWrap() + " hw: " + cursor.getHiddenWrap() :
             this.statusBarMessage;
@@ -79,7 +95,7 @@ public abstract class IOHandler {
      */
     public int getKey() {
         try {
-            ByteBuffer byteBuffer = new ByteBuffer(6);
+            ByteBuffer byteBuffer = new ByteBuffer(8);
             System.in.read(byteBuffer.getBuffer());
             int firstByte = byteBuffer.next();
 
@@ -90,7 +106,7 @@ public abstract class IOHandler {
             int secondByte = byteBuffer.next();
 
             if (secondByte != '[' && secondByte == 0) {
-                return TextEditor.ESC;
+                return firstByte;
             }
 
             int thirdByte = byteBuffer.next();
@@ -171,6 +187,10 @@ public abstract class IOHandler {
         return usedRows;
     }
 
+    public int getStatusBarTextColor() {
+        return statusBarTextColor;
+    }
+
     // Setters
     public void setRows(int rows) {
         this.rows = rows;
@@ -180,7 +200,11 @@ public abstract class IOHandler {
         this.columns = cols;
     }
 
-    public void setStatusBarMessage(StringBuilder builder) {
-        this.statusBarMessage = builder.toString();
+    public void setStatusBarMessage(String message) {
+        this.statusBarMessage = message;
+    }
+
+    public void setStatusBarTextColor(int color) {
+        statusBarTextColor = color;
     }
 }

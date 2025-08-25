@@ -140,8 +140,18 @@ public class WindowsTerminal extends IOHandler implements Terminal {
     /**
      * Update status bar message and refresh terminal screen.
      */ 
-    public void updateStatusBarMessage(StringBuilder builder, Cursor cursor, List<String> content) {
-        super.setStatusBarMessage(builder);
+    public void updateStatusBarMessage(String message, Cursor cursor, List<String> content) {
+        super.setStatusBarTextColor(30);
+        super.setStatusBarMessage(message);
         refreshScreen(content, cursor);
+    }
+
+    public void updateStatusBarMessage(String message, Cursor cursor, List<String> content, int textColor) {
+        super.setStatusBarMessage(message);
+        refreshScreen(content, cursor, textColor);
+    }
+
+    public int getStatusBarTextColor() {
+        return super.getStatusBarTextColor();
     }
 }

@@ -18,6 +18,8 @@ public class Cursor {
     private int pageWrap;       // Accumulated line wraps for the page
     private int hiddenWrap;     // Hidden line wraps due to scrolling
 
+    private boolean contentChanged;
+
     /**
      * Constructs a new Cursor with initialized position and scroll state.
      */
@@ -29,6 +31,7 @@ public class Cursor {
         this.cursorWrap = 0;
         this.pageWrap = 0;
         this.hiddenWrap = 0;
+        this.contentChanged = false;
     }
 
     /**
@@ -67,6 +70,9 @@ public class Cursor {
                 break;
             case TextEditor.BACKSPACE:
                 handleBackspaceScroll(content, columns);
+                break;
+            case TextEditor.ENTER:
+                handleEnterScroll(content, rows, columns);
                 break;
             default:
                 if (!Character.isISOControl(key) && key < 128) {
@@ -169,6 +175,10 @@ public class Cursor {
         }
     }
 
+    private void handleEnterScroll(List<String> content, int rows, int columns) {
+        moveCursorIntoView(content, rows, columns);
+    }
+
     /**
      * Moves the cursor based on the key pressed.
      *
@@ -216,9 +226,12 @@ public class Cursor {
             case TextEditor.BACKSPACE:
                 moveCursorBackspace(content, columns);
                 break;
+            case TextEditor.ENTER:
+                moveCursorEnter(prevCursorY, content, columns);
+                break;
             default:
                 if (!Character.isISOControl(key) && key < 128) {
-                    moveCursorInsertChar();
+                    moveCursorInsertChar(content, columns);
                 }
         }
 
@@ -236,8 +249,7 @@ public class Cursor {
         cursorY = targetRow;
         handleCursorWrap(prevCursorY, content, columns);
 
-        cursorX = targetCol;
-        cursorXcache = cursorX;
+        setCursorX(targetCol);
     }
 
     /**
@@ -316,16 +328,14 @@ public class Cursor {
      * Moves the cursor for HOME key.
      */
     private void moveCursorHome() {
-        cursorX = 0;
-        cursorXcache = cursorX;
+        setCursorX(0);
     }
 
     /**
      * Moves the cursor for END key.
      */
     private void moveCursorEnd(List<String> content) {
-        cursorX = content.get(cursorY).length();
-        cursorXcache = cursorX;
+        setCursorX(content.get(cursorY).length());
     }
 
     /**
@@ -344,20 +354,27 @@ public class Cursor {
                 return;
             }
             cursorY -= 1;
-            cursorX = cursorXcache;
+            setCursorX(cursorXcache);
             cursorWrap -= getWrap(content.get(cursorY).substring(0, cursorX), columns);
         } else {
-            cursorX = Math.max(cursorX - 1, 0);
+            setCursorX(Math.max(cursorX - 1, 0));
         }
-        cursorXcache = cursorX;
     }
 
     /**
      * Moves the cursor when insert one character.
      */
-    private void moveCursorInsertChar() {
-        cursorX += 1;
-        cursorXcache = cursorX;
+    private void moveCursorInsertChar(List<String> content, int columns) {
+        setCursorX(cursorX + 1);
+        if (cursorY > 0) {
+            cursorWrap += getWrap(content.get(cursorY - 1), columns);
+        }
+    }
+
+    private void moveCursorEnter(int prevCursorY, List<String> content, int columns) {
+        cursorY += 1;
+        setCursorX(0);
+        handleCursorWrap(prevCursorY, content, columns);
     }
 
     /**
@@ -392,6 +409,20 @@ public class Cursor {
             case TextEditor.BACKSPACE:
                 editContentBackspace(content);
                 break;
+            case TextEditor.ENTER:
+                editContentEnter(content);
+                break;
+            case TextEditor.ARROW_DOWN:
+            case TextEditor.ARROW_LEFT:
+            case TextEditor.ARROW_RIGHT:
+            case TextEditor.ARROW_UP:
+            case TextEditor.END:
+            case TextEditor.ESC:
+            case TextEditor.FIND:
+            case TextEditor.HOME:
+            case TextEditor.PAGE_DOWN:
+            case TextEditor.PAGE_UP:
+                break;
             default:
                 editContentInsertChar(key, content);
         }
@@ -407,6 +438,7 @@ public class Cursor {
             content.set(cursorY, String.join("", content.get(cursorY), content.get(cursorY + 1)));
             content.remove(cursorY + 1);
         }
+        contentChanged = true;
     }
 
     private void editContentBackspace(List<String> content) {
@@ -420,12 +452,21 @@ public class Cursor {
             content.set(cursorY - 1, String.join("", content.get(cursorY - 1), content.get(cursorY)));
             content.remove(cursorY);
         }
+        contentChanged = true;
     }
 
     private void editContentInsertChar(int key, List<String> content) {
         if (!Character.isISOControl(key) && key < 128) {
             content.set(cursorY, String.join("", content.get(cursorY).substring(0, cursorX), String.valueOf((char)key), content.get(cursorY).substring(cursorX)));
+            contentChanged = true;
         }
+    }
+
+    private void editContentEnter(List<String> content) {
+        String line = content.get(cursorY);
+        content.set(cursorY, line.substring(0, cursorX));
+        content.add(cursorY + 1, line.substring(cursorX));
+        contentChanged = true;
     }
 
     /**
@@ -465,11 +506,25 @@ public class Cursor {
     }
 
     // Setters
+
+    public void setCursorX(int x) {
+        cursorX = x;
+        cursorXcache = cursorX;
+    }
+
     public void addPageWrap(int wrap) {
         pageWrap += wrap;
     }
 
     public void resetPageWrap() {
         pageWrap = 0;
+    }
+
+    public void resetContentChanged() {
+        contentChanged = false;
+    }
+
+    public boolean isContentChanged() {
+        return contentChanged;
     }
 }

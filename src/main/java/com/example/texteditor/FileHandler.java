@@ -4,8 +4,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -15,7 +16,8 @@ import java.util.stream.Stream;
  */
 public class FileHandler {
 
-    private List<String> content = Arrays.asList();
+    private Path path;
+    private List<String> content;
 
     /**
      * Constructs a new FileHandler with an empty content list.
@@ -36,27 +38,51 @@ public class FileHandler {
             System.out.println("Usage: mvn exec:java [-Dexec.args=\"<filename>\"]");
             return;
         }
+
+        getPath(args);
         
         if (args.length == 1) {
-            String filename = args[0].replace("~", System.getProperty("user.home"));;
-            Path path = Paths.get(filename);
-
-            if (!Files.exists(path)) {
-                System.err.println("Error: File '" + filename + "' does not exist.");
-                System.exit(-1);
-            }
-
-            try (Stream<String> stream = Files.lines(path)){
-                content = stream.collect(Collectors.toList());
-            } catch (IOException e) {
-                System.err.println("Error reading file '" + filename + "': " + e.getMessage());
-            }
+            readFile();
         } else {
             content = new ArrayList<>();
             content.add("");
         }
     }
+
+    private void getPath(String[] args) {
+        String filename = args.length == 1 ? args[0].replace("~", System.getProperty("user.home")) : 
+                                             createFileName();
+        path = Paths.get(filename);
+    }
+
+    private void readFile() {
+        if (!Files.exists(path)) {
+            System.err.println("Error: File '" + path.normalize().toString() + "' does not exist.");
+            System.exit(-1);
+        }
+
+        try (Stream<String> stream = Files.lines(path)){
+            content = stream.collect(Collectors.toList());
+        } catch (IOException e) {
+            System.err.println("Error reading file '" + path.normalize().toString() + "': " + e.getMessage());
+        }
+    }
+
+    private String createFileName() {
+        LocalDateTime now = LocalDateTime.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
+        return now.format(formatter) + ".txt";
+    }
     
+    public void saveFile(Cursor cursor, Terminal terminal) {
+        try {
+            Files.write(path, content);
+            terminal.updateStatusBarMessage("Saved file successfully!", cursor, content, 34);
+        } catch (IOException e) {
+            System.err.println("Error saving file '" + path.normalize().toString() + "': " + e.getMessage());
+        }
+    }
+
     /**
      * Gets the content of the opened file.
      *

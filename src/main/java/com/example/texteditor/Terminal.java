@@ -53,5 +53,6 @@ public interface Terminal {
     int getColumns();
 
     //Setters
-    void updateStatusBarMessage(StringBuilder builder, Cursor cursor, List<String> content);
+    void updateStatusBarMessage(String message, Cursor cursor, List<String> content);
+    void updateStatusBarMessage(String message, Cursor cursor, List<String> content, int textColor);
 }

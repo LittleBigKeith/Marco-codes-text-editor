@@ -13,6 +13,7 @@ import com.sun.jna.Platform;
 public class TextEditor {
 
     public static final int ENTER = 13;
+    public static final int ESC = 27;
     public static final int BACKSPACE = 127;
     public static final int ARROW_UP = 1000;
     public static final int ARROW_DOWN = 1001;
@@ -24,7 +25,6 @@ public class TextEditor {
     public static final int END = 1007;
     public static final int DEL = 1008;
     public static final int FIND = 1009;
-    public static final int ESC = 1010;
 
     private final Terminal terminal;
     private final FileHandler fileHandler;
@@ -74,7 +74,8 @@ public class TextEditor {
         while (true) {
             terminal.refreshScreen(content, cursor);
             keyPressed = terminal.getKey();
-            handleActions(keyPressed);
+            terminal.updateStatusBarMessage("", cursor, content);
+            keyPressed = handleActions(keyPressed);
             terminal.handleKey(keyPressed, cursor, content);
         }     
     }
@@ -84,16 +85,26 @@ public class TextEditor {
      *
      * @param keyPressed The key code of the pressed key.
      */
-    private void handleActions(int keyPressed) {
+    private int handleActions(int keyPressed) {
         if (keyPressed == ctrl('f')) {
             find((defaultMsg, userMsg) -> {
                 StringBuilder builder = new StringBuilder();
                 builder.append(userMsg.isEmpty() ? defaultMsg : userMsg);
-                terminal.updateStatusBarMessage(builder, cursor, content);
+                terminal.updateStatusBarMessage(builder.toString(), cursor, content);
             });
         } else if (keyPressed == ctrl('q')) {
-            terminal.exit();
+            if (!cursor.isContentChanged()) {
+                terminal.exit();
+            } else {
+                terminal.updateStatusBarMessage("Cannot quit with unsaved changes [Ctrl+s to save]", cursor, content, 31);
+            }
+        } else if (keyPressed == ctrl('s')) {
+            fileHandler.saveFile(cursor, terminal);
+            cursor.resetContentChanged();
+        } else if (keyPressed == ctrl('h')) {
+            keyPressed = TextEditor.BACKSPACE;
         }
+        return keyPressed;
     }
 
     /**
@@ -118,7 +129,7 @@ public class TextEditor {
                 findNext(SearchDir.FORWARD, builder);
             } else if (keyRead == TextEditor.ARROW_UP || keyRead == TextEditor.ARROW_LEFT) {
                 findNext(SearchDir.BACKWRAD, builder);
-            } else if (keyRead == TextEditor.ESC) {
+            } else if (keyRead == TextEditor.ESC || keyRead == ctrl('q')) {
                 escapeFind(builder);
                 break;
             }
@@ -203,7 +214,7 @@ public class TextEditor {
      */
     private void escapeFind(StringBuilder builder) {
         builder.setLength(0);
-        terminal.updateStatusBarMessage(builder, cursor, content);
+        terminal.updateStatusBarMessage(builder.toString(), cursor, content);
     }
 
     /**
