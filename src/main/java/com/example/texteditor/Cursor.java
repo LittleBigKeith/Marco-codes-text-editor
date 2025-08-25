@@ -249,7 +249,7 @@ public class Cursor {
         cursorY = targetRow;
         handleCursorWrap(prevCursorY, content, columns);
 
-        setCursorX(prevCursorY);
+        setCursorX(targetCol);
     }
 
     /**
