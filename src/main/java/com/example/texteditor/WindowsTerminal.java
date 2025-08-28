@@ -9,7 +9,7 @@ import com.sun.jna.ptr.LongByReference;
  * Implements a terminal interface for Windows consoles using the Kernel32 library.
  * Manages raw mode configuration, window size initialization, and terminal cleanup.
  */
-public class WindowsTerminal extends IOHandler implements Terminal {
+public class WindowsTerminal extends Terminal {
 
     // Static handles for console input and output.
     private static Pointer outHandle;
@@ -23,7 +23,6 @@ public class WindowsTerminal extends IOHandler implements Terminal {
      * Enables raw mode for the console, disabling line buffering and enabling virtual terminal processing.
      * Configures the console to handle input and output in a raw, unprocessed manner.
      */
-    @Override
     public void enableRawMode() {
 
         outHandle = LibKernel32.INSTANCE.GetStdHandle(LibKernel32.STD_OUTPUT_HANDLE);
@@ -86,7 +85,6 @@ public class WindowsTerminal extends IOHandler implements Terminal {
      * Restores the console to its original mode, disabling raw mode.
      * Reverts input and output settings to their initial state.
      */
-    @Override
     public void disableRawMode() {
         if (!LibKernel32.INSTANCE.SetConsoleMode(outHandle, dwOriginalOutMode.getValue())) {
             System.err.println("An error occured while restoring output console mode: " + dwOriginalOutMode);
@@ -103,7 +101,6 @@ public class WindowsTerminal extends IOHandler implements Terminal {
      * Initializes the terminal window size based on the console screen buffer information.
      * Sets the number of rows and columns for the terminal.
      */
-    @Override
     public void initWindowSize() {
         LibKernel32.ConsoleScreenBufferInfo bufferInfo = getBufferInfo();
         setRows(bufferInfo.srWindow.bottom - bufferInfo.srWindow.top - 1);
@@ -129,7 +126,6 @@ public class WindowsTerminal extends IOHandler implements Terminal {
      * Exits the terminal by clearing the screen, resetting the cursor, and restoring original modes.
      * Terminates the program cleanly.
      */
-    @Override
     public void exit() {
         System.out.print("\033[2J");    // Clear the screen
         System.out.print("\033[H");     // Move cursor to top-left
@@ -137,21 +133,26 @@ public class WindowsTerminal extends IOHandler implements Terminal {
         System.exit(0);
     }
 
-    /**
-     * Update status bar message and refresh terminal screen.
-     */ 
-    public void updateStatusBarMessage(String message, Cursor cursor, List<String> content) {
-        super.setStatusBarTextColor(30);
-        super.setStatusBarMessage(message);
-        refreshScreen(content, cursor);
+    public void setLocale() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'setLocale'");
     }
 
-    public void updateStatusBarMessage(String message, Cursor cursor, List<String> content, int textColor) {
-        super.setStatusBarMessage(message);
-        refreshScreen(content, cursor, textColor);
+    public int getCharWidth(long wc) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'getCharWidth'");
     }
 
-    public int getStatusBarTextColor() {
-        return super.getStatusBarTextColor();
+    @Override
+    int getLineWidth(List<String> content, int cursorY) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'getLineWidth'");
     }
+
+    @Override
+    int getLineWidthUpTo(List<String> content, int cursorY, int cursorX) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'getLineWidthUpTo'");
+    }
+   
 }

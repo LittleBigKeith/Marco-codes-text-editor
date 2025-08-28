@@ -12,6 +12,7 @@ public class Cursor {
 
     private int cursorX;        // Current x-coordinate of the cursor (column)
     private int cursorXcache;   // Cached x-coordinate for cursor movement
+    private int cursorXOnScreen;
     private int cursorY;        // Current y-coordinate of the cursor (line)
     private int offsetY;        // Vertical scroll offset (first visible line)
     private int cursorWrap;     // Accumulated line wraps for the cursor
@@ -26,6 +27,7 @@ public class Cursor {
     public Cursor() {
         this.cursorX = 0;
         this.cursorXcache = 0;
+        this.cursorXOnScreen = 0;
         this.cursorY = 0;
         this.offsetY = 0;
         this.cursorWrap = 0;
@@ -187,7 +189,7 @@ public class Cursor {
      * @param usedRows The number of rows currently occupied by content.
      * @param columns  The number of columns in the terminal.
      */
-    public void moveCursor(int key, List<String> content, IOHandler terminal, int usedRows, int columns) {
+    public void moveCursor(int key, List<String> content, Terminal terminal, int usedRows, int columns) {
 
         if (content.isEmpty()) {
             return;
@@ -239,7 +241,7 @@ public class Cursor {
         cursorX = Math.min(cursorXcache, Math.max(content.get(cursorY).length(), 0));
     }
 
-    public void moveCursor(int key, List<String> content, IOHandler ioHandler, int usedRows, int columns, int targetRow, int targetCol) {
+    public void moveCursor(int key, List<String> content, Terminal terminal, int usedRows, int columns, int targetRow, int targetCol) {
         if (content.isEmpty()) {
             return;
         }
@@ -301,7 +303,7 @@ public class Cursor {
     /**
      * Moves the cursor left one character.
      */
-    private void moveCursorLeft(List<String> content, IOHandler terminal) {
+    private void moveCursorLeft(List<String> content, Terminal terminal) {
         if (cursorX > 0) {
             cursorX--;
             cursorXcache = cursorX;
@@ -314,7 +316,7 @@ public class Cursor {
     /**
      * Moves the cursor right one character.
      */
-    private void moveCursorRight(List<String> content, IOHandler terminal) {
+    private void moveCursorRight(List<String> content, Terminal terminal) {
         if (cursorX < content.get(cursorY).length()) {
             cursorX++;
             cursorXcache = cursorX;
@@ -397,7 +399,7 @@ public class Cursor {
      * @param key     The key code representing the user input.
      * @param content The list of text lines in the editor.
      */
-    public void editContent(int key, List<String> content) {
+    public void editContent(int key, List<String> content, ByteBuffer byteBuffer) {
         if (content.size() <= 0) {
             return;
         }
@@ -424,7 +426,7 @@ public class Cursor {
             case TextEditor.PAGE_UP:
                 break;
             default:
-                editContentInsertChar(key, content);
+                editContentInsertChar(key, content, byteBuffer);
         }
     }
 
@@ -455,9 +457,9 @@ public class Cursor {
         contentChanged = true;
     }
 
-    private void editContentInsertChar(int key, List<String> content) {
-        if (!Character.isISOControl(key) && key < 128) {
-            content.set(cursorY, String.join("", content.get(cursorY).substring(0, cursorX), String.valueOf((char)key), content.get(cursorY).substring(cursorX)));
+    private void editContentInsertChar(int key, List<String> content, ByteBuffer byteBuffer) {
+        if (!Character.isISOControl(key)) {
+            content.set(cursorY, String.join("", content.get(cursorY).substring(0, cursorX), new String(byteBuffer.getFilteredBuffer()), content.get(cursorY).substring(cursorX)));
             contentChanged = true;
         }
     }
@@ -481,8 +483,13 @@ public class Cursor {
     }
 
     // Getters
+
     public int getCursorX() {
         return cursorX;
+    }
+
+    public int getCursorXOnScreen() {
+        return cursorXOnScreen;
     }
 
     public int getCursorY() {

@@ -5,7 +5,7 @@ import java.util.List;
 /**
  * Handles terminal operations, including raw mode configuration, screen rendering, and keypress handling.
  */
-public class UnixBasedTerminal extends IOHandler implements Terminal {
+public class UnixBasedTerminal extends Terminal {
 
     private static LibC.Termios originalAttributes; // Original terminal attributes to restore on exit
 
@@ -42,6 +42,7 @@ public class UnixBasedTerminal extends IOHandler implements Terminal {
         LibC.INSTANCE.tcsetattr(LibC.SYSTEM_OUT_FD, LibC.TCSAFLUSH, termios);
     }
     
+    @Override
     public void disableRawMode() {
         LibC.INSTANCE.tcsetattr(LibC.SYSTEM_OUT_FD, LibC.TCSAFLUSH, originalAttributes);  // Restore original terminal attributes before exiting
     }
@@ -82,21 +83,27 @@ public class UnixBasedTerminal extends IOHandler implements Terminal {
         System.exit(0);
     }
 
-    /**
-     * Update status bar message and refresh terminal screen.
-     */ 
-    public void updateStatusBarMessage(String message, Cursor cursor, List<String> content) {
-        super.setStatusBarTextColor(30);
-        super.setStatusBarMessage(message);
-        refreshScreen(content, cursor);
+    @Override
+    public void setLocale() {
+        String locale = LibC.INSTANCE.setlocale(LibC.LC_ALL, "");
+        if (locale == null) {
+            System.err.println("Failed to set locale");
+            System.exit(-1);
+        }
     }
 
-    public void updateStatusBarMessage(String message, Cursor cursor, List<String> content, int textColor) {
-        super.setStatusBarMessage(message);
-        refreshScreen(content, cursor, textColor);
+    public int getCharWidth(long wc) {
+        return LibC.INSTANCE.wcwidth(wc);
+    }
+    
+    @Override
+    public int getLineWidth(List<String> content, int cursorY) {
+        return content.get(cursorY).chars().map(c -> getCharWidth(c)).sum();
     }
 
-    public int getStatusBarTextColor() {
-        return super.getStatusBarTextColor();
+    @Override
+    public int getLineWidthUpTo(List<String> content, int cursorY, int cursorX) {
+        return content.get(cursorY).substring(0, cursorX).chars().map(c -> getCharWidth(c)).sum();
     }
+    
 }

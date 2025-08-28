@@ -70,14 +70,15 @@ public class TextEditor {
         // Enable raw mode to capture keypresses directly without buffering
         terminal.enableRawMode();
         terminal.initWindowSize();
-
+        terminal.setLocale();
+        
         while (true) {
             terminal.refreshScreen(content, cursor);
             keyPressed = terminal.getKey();
             terminal.updateStatusBarMessage("", cursor, content);
             keyPressed = handleActions(keyPressed);
             terminal.handleKey(keyPressed, cursor, content);
-        }     
+        }    
     }
 
     /**
@@ -91,7 +92,7 @@ public class TextEditor {
                 StringBuilder builder = new StringBuilder();
                 builder.append(userMsg.isEmpty() ? defaultMsg : userMsg);
                 terminal.updateStatusBarMessage(builder.toString(), cursor, content);
-            });
+            }, terminal.getByteBuffer());
         } else if (keyPressed == ctrl('q')) {
             if (!cursor.isContentChanged()) {
                 terminal.exit();
@@ -113,25 +114,44 @@ public class TextEditor {
      *
      * @param prompt BiConsumer to update the status bar with the search prompt.
      */
-    private void find(BiConsumer<String, String> prompt) {
+    private void find(BiConsumer<String, String> prompt, ByteBuffer byteBuffer) {
         StringBuilder builder = new StringBuilder();
 
         while (true) {
             prompt.accept(DEFAULT_FIND_PROMPT, builder.toString());
             int keyRead = terminal.getKey();
-            if (!Character.isISOControl(keyRead) && keyRead < 128) {
-                builder.append((char)keyRead);
-                findStringInText(builder);
-            } else if (keyRead == TextEditor.BACKSPACE || keyRead == TextEditor.DEL) {
-                builder.setLength(Math.max(builder.length() - 1, 0));
-                findStringInText(builder);
-            } else if (keyRead == TextEditor.ENTER || keyRead == TextEditor.ARROW_DOWN || keyRead == TextEditor.ARROW_RIGHT) {
-                findNext(SearchDir.FORWARD, builder);
-            } else if (keyRead == TextEditor.ARROW_UP || keyRead == TextEditor.ARROW_LEFT) {
-                findNext(SearchDir.BACKWRAD, builder);
-            } else if (keyRead == TextEditor.ESC || keyRead == ctrl('q')) {
-                escapeFind(builder);
-                break;
+            switch (keyRead) {
+                case TextEditor.BACKSPACE:
+                case TextEditor.DEL:
+                    builder.setLength(Math.max(builder.length() - 1, 0));
+                    findStringInText(builder);
+                    break;
+                case TextEditor.ENTER:
+                case TextEditor.ARROW_DOWN:
+                case TextEditor.ARROW_RIGHT:
+                    findNext(SearchDir.FORWARD, builder);
+                    break;
+                case TextEditor.ARROW_UP:
+                case TextEditor.ARROW_LEFT:
+                    findNext(SearchDir.BACKWRAD, builder);
+                    break;
+                case TextEditor.ESC:
+                    escapeFind(builder);
+                    return;
+                case TextEditor.HOME:
+                case TextEditor.END:
+                case TextEditor.PAGE_UP:
+                case TextEditor.PAGE_DOWN:
+                case TextEditor.FIND:
+                    break;
+                default:
+                    if (keyRead == ctrl('q')) {
+                        escapeFind(builder);
+                        return;
+                    } else if (!Character.isISOControl(keyRead)) {
+                        builder.append(new String(byteBuffer.getFilteredBuffer()));
+                        findStringInText(builder);
+                    } 
             }
         }
     }
