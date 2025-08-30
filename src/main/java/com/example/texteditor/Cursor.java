@@ -12,7 +12,6 @@ public class Cursor {
 
     private int cursorX;        // Current x-coordinate of the cursor (column)
     private int cursorXcache;   // Cached x-coordinate for cursor movement
-    private int cursorXOnScreen;
     private int cursorY;        // Current y-coordinate of the cursor (line)
     private int offsetY;        // Vertical scroll offset (first visible line)
     private int cursorWrap;     // Accumulated line wraps for the cursor
@@ -20,6 +19,7 @@ public class Cursor {
     private int hiddenWrap;     // Hidden line wraps due to scrolling
 
     private boolean contentChanged;
+    private int backspaceCache;
 
     /**
      * Constructs a new Cursor with initialized position and scroll state.
@@ -27,7 +27,6 @@ public class Cursor {
     public Cursor() {
         this.cursorX = 0;
         this.cursorXcache = 0;
-        this.cursorXOnScreen = 0;
         this.cursorY = 0;
         this.offsetY = 0;
         this.cursorWrap = 0;
@@ -45,7 +44,7 @@ public class Cursor {
      * @param usedRows   The number of rows currently occupied by content.
      * @param columns    The number of columns in the terminal.
      */
-    public void scroll(int key, List<String> content, int rows, int columns) {
+    public void scroll(int key, List<String> content, int rows, int columns, Terminal terminal) {
 
         if (content.size() <= 0) {
             return;
@@ -53,32 +52,32 @@ public class Cursor {
 
         switch(key) {
             case TextEditor.ARROW_DOWN:
-                handleArrowDownScroll(content, rows, columns);
+                handleArrowDownScroll(content, rows, columns, terminal);
                 break;
             case TextEditor.ARROW_UP:
-                handleArrowUpScroll(content, columns);
+                handleArrowUpScroll(content, columns, terminal);
                 break;
             case TextEditor.PAGE_DOWN:
-                handlePageDownScroll(content, columns);
+                handlePageDownScroll(content, columns, terminal);
                 break;
             case TextEditor.PAGE_UP:
-                handlePageUpScroll(content, rows, columns);
+                handlePageUpScroll(content, rows, columns, terminal);
                 break;
             case TextEditor.FIND:
-                handleFindScroll(content, columns);
+                handleFindScroll(content, columns, terminal);
                 break;
             case TextEditor.DEL:
-                handleDelScroll(content, rows, columns);
+                handleDelScroll(content, rows, columns, terminal);
                 break;
             case TextEditor.BACKSPACE:
-                handleBackspaceScroll(content, columns);
+                handleBackspaceScroll(content, columns, terminal);
                 break;
             case TextEditor.ENTER:
-                handleEnterScroll(content, rows, columns);
+                handleEnterScroll(content, rows, columns, terminal);
                 break;
             default:
                 if (!Character.isISOControl(key) && key < 128) {
-                    handleInsertCharScroll(content, rows, columns);
+                    handleInsertCharScroll(content, rows, columns, terminal);
                 }
         }
     }
@@ -86,13 +85,13 @@ public class Cursor {
     /**
      * Handles scrolling logic for ARROW_DOWN key.
      */
-    private void handleArrowDownScroll(List<String> content, int rows, int columns) {
-        moveCursorIntoView(content, rows, columns);
+    private void handleArrowDownScroll(List<String> content, int rows, int columns, Terminal terminal) {
+        moveCursorIntoView(content, rows, columns, terminal);
     }
 
-    private void moveCursorIntoView(List<String> content, int rows, int columns) {
-        while (cursorY + cursorWrap + getWrap(content.get(cursorY), columns) > offsetY + hiddenWrap + rows) {
-            hiddenWrap += getWrap(content.get(offsetY), columns);
+    private void moveCursorIntoView(List<String> content, int rows, int columns, Terminal terminal) {
+        while (cursorY + cursorWrap + getWrap(content.get(cursorY), columns, terminal) > offsetY + hiddenWrap + rows) {
+            hiddenWrap += getWrap(content.get(offsetY), columns, terminal);
             offsetY = Math.min(offsetY + 1, content.size());
         }
     }
@@ -100,9 +99,9 @@ public class Cursor {
     /**
      * Handles scrolling logic for inserting a character.
      */
-    private void handleInsertCharScroll(List<String> content, int rows, int columns) {
-        if (cursorY + cursorWrap + getWrap(content.get(cursorY), columns) > offsetY + hiddenWrap + rows) {
-            hiddenWrap += getWrap(content.get(offsetY), columns);
+    private void handleInsertCharScroll(List<String> content, int rows, int columns, Terminal terminal) {
+        if (cursorY + cursorWrap + getWrap(content.get(cursorY), columns, terminal) > offsetY + hiddenWrap + rows) {
+            hiddenWrap += getWrap(content.get(offsetY), columns, terminal);
             offsetY = Math.min(offsetY + 1, content.size());
         }
     }
@@ -110,24 +109,24 @@ public class Cursor {
     /**
      * Handles scrolling logic for ARROW_UP key.
      */
-    private void handleArrowUpScroll(List<String> content, int columns) {
+    private void handleArrowUpScroll(List<String> content, int columns, Terminal terminal) {
         if (cursorY < offsetY) {
-            scrollUpOneLine(content, columns);
+            scrollUpOneLine(content, columns, terminal);
         }
     }
 
-    private void scrollUpOneLine(List<String> content, int columns) {
+    private void scrollUpOneLine(List<String> content, int columns, Terminal terminal) {
         offsetY = Math.max(offsetY - 1, 0);
-        hiddenWrap -= getWrap(content.get(cursorY), columns);
+        hiddenWrap -= getWrap(content.get(cursorY), columns, terminal);
     }
     
     /**
      * Handles scrolling logic for PAGE_DOWN key.
      */
-    private void handlePageDownScroll(List<String> content, int columns) {
+    private void handlePageDownScroll(List<String> content, int columns, Terminal terminal) {
         int addedHiddenWrap = 0;
         for (int i = offsetY; i < cursorY; i++) {
-            addedHiddenWrap += getWrap(content.get(i), columns); 
+            addedHiddenWrap += getWrap(content.get(i), columns, terminal); 
         }
         hiddenWrap += addedHiddenWrap;
         offsetY = cursorY;
@@ -136,14 +135,14 @@ public class Cursor {
     /**
      * Handles scrolling logic for PAGE_UP key.
      */
-    private void handlePageUpScroll(List<String> content, int rows, int columns) {
+    private void handlePageUpScroll(List<String> content, int rows, int columns, Terminal terminal) {
         int reducedHiddenWrap = 0;
-        int startOffsetWrap = getWrap(content.get(offsetY), columns);
+        int startOffsetWrap = getWrap(content.get(offsetY), columns, terminal);
         while (offsetY > 0) {
             offsetY--;
-            reducedHiddenWrap += getWrap(content.get(offsetY), columns);
+            reducedHiddenWrap += getWrap(content.get(offsetY), columns, terminal);
             if (cursorY - offsetY + 1 + startOffsetWrap + reducedHiddenWrap > rows) {
-                reducedHiddenWrap -= getWrap(content.get(offsetY), columns);
+                reducedHiddenWrap -= getWrap(content.get(offsetY), columns, terminal);
                 offsetY++;
                 break;
             }
@@ -154,31 +153,31 @@ public class Cursor {
     /**
      * Handles scrolling logic for find function.
      */
-    private void handleFindScroll(List<String> content, int columns) {
+    private void handleFindScroll(List<String> content, int columns, Terminal terminal) {
         if (offsetY < cursorY) {
-            handlePageDownScroll(content, columns);
+            handlePageDownScroll(content, columns, terminal);
         } else {
             int reducedHiddenWrap = 0;
             for (int i = cursorY; i < offsetY; i++) {
-                reducedHiddenWrap += getWrap(content.get(i), columns);
+                reducedHiddenWrap += getWrap(content.get(i), columns, terminal);
             }
             hiddenWrap -= reducedHiddenWrap;
             offsetY = cursorY;
         }
     }
 
-    private void handleDelScroll(List<String> content, int rows, int columns) {
-        moveCursorIntoView(content, rows, columns);
+    private void handleDelScroll(List<String> content, int rows, int columns, Terminal terminal) {
+        moveCursorIntoView(content, rows, columns, terminal);
     }
 
-    private void handleBackspaceScroll(List<String> content, int columns) {
+    private void handleBackspaceScroll(List<String> content, int columns, Terminal terminal) {
         if (cursorY < offsetY) {
-            scrollUpOneLine(content, columns);
+            scrollUpOneLine(content, columns, terminal);
         }
     }
 
-    private void handleEnterScroll(List<String> content, int rows, int columns) {
-        moveCursorIntoView(content, rows, columns);
+    private void handleEnterScroll(List<String> content, int rows, int columns, Terminal terminal) {
+        moveCursorIntoView(content, rows, columns, terminal);
     }
 
     /**
@@ -199,16 +198,16 @@ public class Cursor {
 
         switch (key) {
             case TextEditor.ARROW_DOWN:
-                moveCursorDown(prevCursorY, content, columns);
+                moveCursorDown(prevCursorY, content, columns, terminal);
                 break;
             case TextEditor.ARROW_UP:
-                moveCursorUp(prevCursorY, content, columns);
+                moveCursorUp(prevCursorY, content, columns, terminal);
                 break;
             case TextEditor.PAGE_DOWN:
-                moveCursorPageDown(prevCursorY, content, columns, usedRows);
+                moveCursorPageDown(prevCursorY, content, columns, usedRows, terminal);
                 break;
             case TextEditor.PAGE_UP:
-                moveCursorPageUp(prevCursorY, content, columns);
+                moveCursorPageUp(prevCursorY, content, columns, terminal);
                 break;
             case TextEditor.ARROW_LEFT:
                 moveCursorLeft(content, terminal);
@@ -226,14 +225,14 @@ public class Cursor {
                 moveCursorDel(content);
                 break;
             case TextEditor.BACKSPACE:
-                moveCursorBackspace(content, columns);
+                moveCursorBackspace(content, columns, terminal);
                 break;
             case TextEditor.ENTER:
-                moveCursorEnter(prevCursorY, content, columns);
+                moveCursorEnter(prevCursorY, content, columns, terminal);
                 break;
             default:
-                if (!Character.isISOControl(key) && key < 128) {
-                    moveCursorInsertChar(content, columns);
+                if (!Character.isISOControl(key)) {
+                    moveCursorInsertChar(content, columns, terminal);
                 }
         }
 
@@ -249,7 +248,7 @@ public class Cursor {
         int prevCursorY = cursorY;
 
         cursorY = targetRow;
-        handleCursorWrap(prevCursorY, content, columns);
+        handleCursorWrap(prevCursorY, content, columns, terminal);
 
         setCursorX(targetCol);
     }
@@ -257,39 +256,39 @@ public class Cursor {
     /**
      * Moves the cursor down one line.
      */
-    private void moveCursorDown(int prevCursorY, List<String> content, int columns) {
+    private void moveCursorDown(int prevCursorY, List<String> content, int columns, Terminal terminal) {
         if (cursorY < content.size() - 1) {
             cursorY++;
-            handleCursorWrap(prevCursorY, content, columns);
+            handleCursorWrap(prevCursorY, content, columns, terminal);
         }
     }
 
     /**
      * Moves the cursor up one line.
      */
-    private void moveCursorUp(int prevCursorY, List<String> content, int columns) {
+    private void moveCursorUp(int prevCursorY, List<String> content, int columns, Terminal terminal) {
         if (cursorY > 0) {
             cursorY--;
-            handleCursorWrap(prevCursorY, content, columns);
+            handleCursorWrap(prevCursorY, content, columns, terminal);
         }
     }
 
     /**
      * Moves the cursor for PAGE_DOWN key.
      */
-    private void moveCursorPageDown(int prevCursorY, List<String> content, int columns, int usedRows) {
+    private void moveCursorPageDown(int prevCursorY, List<String> content, int columns, int usedRows, Terminal terminal) {
         if (offsetY + usedRows - pageWrap == content.size()) {
             cursorY = offsetY + usedRows - pageWrap - 1;
         } else {
             cursorY = offsetY + usedRows - pageWrap - PAGE_SCROLL_OFFSET;
         }
-        handleCursorWrap(prevCursorY, content, columns);
+        handleCursorWrap(prevCursorY, content, columns, terminal);
     }
 
     /**
      * Moves the cursor for PAGE_UP key.
      */
-    private void moveCursorPageUp(int prevCursorY, List<String> content, int columns) {
+    private void moveCursorPageUp(int prevCursorY, List<String> content, int columns, Terminal terminal) {
         if (offsetY == 0) {
             cursorY = offsetY;
         } else if (offsetY == content.size() - 1) {
@@ -297,7 +296,7 @@ public class Cursor {
         } else {
             cursorY = offsetY + PAGE_SCROLL_OFFSET - 1;
         }
-        handleCursorWrap(prevCursorY, content, columns);
+        handleCursorWrap(prevCursorY, content, columns, terminal);
     }
 
     /**
@@ -305,7 +304,8 @@ public class Cursor {
      */
     private void moveCursorLeft(List<String> content, Terminal terminal) {
         if (cursorX > 0) {
-            cursorX--;
+            int charCount = cursorX >= 2 && Character.charCount(content.get(cursorY).codePointAt(cursorX - 2)) == 2 ? 2 : 1;
+            setCursorX(cursorX - charCount);
             cursorXcache = cursorX;
         } else if (cursorY > 0) {
             terminal.handleKey(TextEditor.ARROW_UP, this, content);
@@ -318,7 +318,8 @@ public class Cursor {
      */
     private void moveCursorRight(List<String> content, Terminal terminal) {
         if (cursorX < content.get(cursorY).length()) {
-            cursorX++;
+            int codePoint = content.get(cursorY).codePointAt(cursorX);
+            setCursorX(cursorX + Character.charCount(codePoint));
             cursorXcache = cursorX;
         } else if (cursorY < content.size() - 1) {
             terminal.handleKey(TextEditor.ARROW_DOWN, this, content);
@@ -350,45 +351,46 @@ public class Cursor {
     /**
      * Moves the cursor for backspace key.
      */
-    private void moveCursorBackspace(List<String> content, int columns) {
+    private void moveCursorBackspace(List<String> content, int columns, Terminal terminal) {
         if (cursorX == 0) {
             if (cursorY <= 0) {
                 return;
             }
             cursorY -= 1;
             setCursorX(cursorXcache);
-            cursorWrap -= getWrap(content.get(cursorY).substring(0, cursorX), columns);
+            cursorWrap -= getWrap(content.get(cursorY).substring(0, cursorX), columns, terminal);
         } else {
-            setCursorX(Math.max(cursorX - 1, 0));
+            setCursorX(Math.max(cursorX - backspaceCache, 0));
         }
     }
 
     /**
      * Moves the cursor when insert one character.
      */
-    private void moveCursorInsertChar(List<String> content, int columns) {
-        setCursorX(cursorX + 1);
+    private void moveCursorInsertChar(List<String> content, int columns, Terminal terminal) {
+        int codePoint = content.get(cursorY).codePointAt(cursorX);
+        setCursorX(cursorX + Character.charCount(codePoint));
         if (cursorY > 0) {
-            cursorWrap += getWrap(content.get(cursorY - 1), columns);
+            cursorWrap += getWrap(content.get(cursorY - 1), columns, terminal);
         }
     }
 
-    private void moveCursorEnter(int prevCursorY, List<String> content, int columns) {
+    private void moveCursorEnter(int prevCursorY, List<String> content, int columns, Terminal terminal) {
         cursorY += 1;
         setCursorX(0);
-        handleCursorWrap(prevCursorY, content, columns);
+        handleCursorWrap(prevCursorY, content, columns, terminal);
     }
 
     /**
      * Updates cursor wrap count when scrolling pages.
      */
-    private void handleCursorWrap(int prevCursorY, List<String> content, int columns) {
+    private void handleCursorWrap(int prevCursorY, List<String> content, int columns, Terminal terminal) {
         int addedCursorWrap= 0;
         for (int i = cursorY; i < prevCursorY; i++) {
-            addedCursorWrap -= getWrap(content.get(i), columns);
+            addedCursorWrap -= getWrap(content.get(i), columns, terminal);
         }
         for (int i = prevCursorY; i < cursorY; i++) {
-            addedCursorWrap += getWrap(content.get(i), columns);
+            addedCursorWrap += getWrap(content.get(i), columns, terminal);
         }
         cursorWrap += addedCursorWrap;
     }
@@ -445,13 +447,15 @@ public class Cursor {
 
     private void editContentBackspace(List<String> content) {
         if (cursorX > 0) {
-            content.set(cursorY, String.join("", content.get(cursorY).substring(0, Math.max(cursorX - 1, 0)), content.get(cursorY).substring(cursorX)));
+            backspaceCache = cursorX >= 2 && Character.charCount(content.get(cursorY).codePointAt(cursorX - 2)) == 2 ? 2 : 1;
+            content.set(cursorY, String.join("", content.get(cursorY).substring(0, Math.max(cursorX - backspaceCache, 0)), content.get(cursorY).substring(cursorX)));
         } else {
             if (cursorY == 0) {
                 return;
             }
             cursorXcache = content.get(cursorY - 1).length();
-            content.set(cursorY - 1, String.join("", content.get(cursorY - 1), content.get(cursorY)));
+            backspaceCache = cursorX >= 2 && Character.charCount(content.get(cursorY).codePointAt(cursorX - 2)) == 2 ? 2 : 1;
+            content.set(cursorY - 1, String.join("", content.get(cursorY - backspaceCache), content.get(cursorY)));
             content.remove(cursorY);
         }
         contentChanged = true;
@@ -478,18 +482,14 @@ public class Cursor {
      * @param columns The number of columns in the terminal.
      * @return The number of wraps needed for the line.
      */
-    public int getWrap(String line, int columns) {
-        return Math.max(line.length() - 1, 0) / columns;
+    public int getWrap(String line, int columns, Terminal terminal) {
+        return Math.max(terminal.getLineWidth(line, columns) - 1, 0) / columns;
     }
 
     // Getters
 
     public int getCursorX() {
         return cursorX;
-    }
-
-    public int getCursorXOnScreen() {
-        return cursorXOnScreen;
     }
 
     public int getCursorY() {

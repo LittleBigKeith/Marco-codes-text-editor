@@ -32,8 +32,8 @@ public abstract class Terminal {
     public void drawScreen(List<String> content, Cursor cursor) {
         StringBuilder builder = new StringBuilder();
         drawContent(builder, content, cursor);
-        drawStatusBar(builder, cursor);
-        drawCursor(builder, cursor);
+        drawStatusBar(builder, cursor, content);
+        drawCursor(builder, content, cursor);
         System.out.print(builder);
     }
 
@@ -49,10 +49,10 @@ public abstract class Terminal {
                 builder.append("~");  // draw ~
             } else {
                 String buffer = content.get(i + cursor.getOffsetY());
-                int wrap = cursor.getWrap(buffer, columns);
+                int wrap = cursor.getWrap(buffer, columns, this);
                 if (wrap < rows - cursor.getPageWrap() - i + 1) {
                     builder.append(buffer);  // draw a line of content
-                    usedRows += cursor.getWrap(buffer, columns) + 1;
+                    usedRows += cursor.getWrap(buffer, columns, this) + 1;
                 } else {
                     for (int j = 0; j < rows - cursor.getPageWrap() - i + 1; j++) {
                         builder.append("@\033[K\r\n");  // draw @
@@ -68,16 +68,16 @@ public abstract class Terminal {
     /**
      * Draws the status bar with editor information.
      */
-    private void drawStatusBar(StringBuilder builder, Cursor cursor) {
+    private void drawStatusBar(StringBuilder builder, Cursor cursor, List<String> content) {
         builder.append("\033[47;");
         builder.append(statusBarTextColor);
         builder.append("m");
-        drawStatusBarMessage(builder, cursor);
+        drawStatusBarMessage(builder, cursor, content);
     }
 
-    private void drawStatusBarMessage(StringBuilder builder, Cursor cursor) {
+    private void drawStatusBarMessage(StringBuilder builder, Cursor cursor, List<String> content) {
         String statusBarMessage = this.statusBarMessage.isEmpty() ?
-            "R: " + usedRows + " cY: " + cursor.getCursorY() + " oY: " + cursor.getOffsetY() + " pw: " + cursor.getPageWrap() + " cw: " + cursor.getCursorWrap() + " hw: " + cursor.getHiddenWrap() :
+            "R: " + usedRows + " cX: " + cursor.getCursorX() + " cY: " + cursor.getCursorY() + " oY: " + cursor.getOffsetY() + " pw: " + cursor.getPageWrap() + " cw: " + cursor.getCursorWrap() + " hw: " + cursor.getHiddenWrap() + " lw: " + getLineWidthUpTo(content.get(cursor.getCursorY()), cursor.getCursorX(), columns) :
             this.statusBarMessage;
         builder.append(statusBarMessage).append(String.join("", Collections.nCopies(Math.max(0, (columns - statusBarMessage.length())), " ")));
         builder.append("\033[0m"); // Reset ANSI attributes to normal
@@ -86,8 +86,8 @@ public abstract class Terminal {
     /**
      * Positions the cursor on the screen.
      */
-    private void drawCursor(StringBuilder builder, Cursor cursor) {
-        builder.append(String.format("\033[%d;%dH", cursor.getCursorY() - cursor.getOffsetY() + cursor.getCursorWrap() - cursor.getHiddenWrap() + cursor.getCursorX() / columns + 1, cursor.getCursorX() % columns + 1));
+    private void drawCursor(StringBuilder builder, List<String> content, Cursor cursor) {
+        builder.append(String.format("\033[%d;%dH", cursor.getCursorY() - cursor.getOffsetY() + cursor.getCursorWrap() - cursor.getHiddenWrap() + getLineWidthUpTo(content.get(cursor.getCursorY()), cursor.getCursorX(), columns) / columns + 1, getLineWidthUpTo(content.get(cursor.getCursorY()), cursor.getCursorX(), columns) % columns + 1));
     }
 
     /**
@@ -167,13 +167,13 @@ public abstract class Terminal {
     public void handleKey(int keyPressed, Cursor cursor, List<String> content) {
         cursor.editContent(keyPressed, content, byteBuffer);
         cursor.moveCursor(keyPressed, content, this, usedRows, columns);
-        cursor.scroll(keyPressed, content, rows, columns);
+        cursor.scroll(keyPressed, content, rows, columns, this);
     }
 
     public void handleKey(int keyPressed, Cursor cursor, List<String> content, int targetRow, int targetCol) {
         cursor.editContent(keyPressed, content, byteBuffer);
         cursor.moveCursor(keyPressed, content, this, usedRows, columns, targetRow, targetCol);
-        cursor.scroll(keyPressed, content, rows, columns);
+        cursor.scroll(keyPressed, content, rows, columns, this);
     }
     
 
@@ -233,7 +233,8 @@ public abstract class Terminal {
     abstract void disableRawMode();
     abstract void initWindowSize();
     abstract void setLocale();
-    abstract int getLineWidth(List<String> content, int cursorY);
-    abstract int getLineWidthUpTo(List<String> content, int cursorY, int cursorX);
+    abstract int getCharWidth(long c);
+    abstract int getLineWidth(String line, int columns);
+    abstract int getLineWidthUpTo(String line, int cursorX, int columns);
     abstract void exit();
 }

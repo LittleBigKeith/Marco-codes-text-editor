@@ -1,7 +1,5 @@
 package com.example.texteditor;
 
-import java.util.List;
-
 /**
  * Handles terminal operations, including raw mode configuration, screen rendering, and keypress handling.
  */
@@ -93,17 +91,25 @@ public class UnixBasedTerminal extends Terminal {
     }
 
     public int getCharWidth(long wc) {
-        return LibC.INSTANCE.wcwidth(wc);
+        int charWidth = LibC.INSTANCE.wcwidth(wc);
+        return charWidth > 0 ? charWidth : 0;
     }
     
     @Override
-    public int getLineWidth(List<String> content, int cursorY) {
-        return content.get(cursorY).chars().map(c -> getCharWidth(c)).sum();
+    public int getLineWidth(String line, int columns) {
+        int lineWidth = 0;
+        for (char c : line.toCharArray()) {
+            if (lineWidth % columns + getCharWidth(c) > columns) {
+                lineWidth += columns - lineWidth % columns;
+            }
+            lineWidth += getCharWidth(c);
+        }
+        return lineWidth;
     }
 
     @Override
-    public int getLineWidthUpTo(List<String> content, int cursorY, int cursorX) {
-        return content.get(cursorY).substring(0, cursorX).chars().map(c -> getCharWidth(c)).sum();
+    public int getLineWidthUpTo(String line, int cursorX, int columns) {
+        return getLineWidth(line.substring(0, cursorX), columns);
     }
     
 }

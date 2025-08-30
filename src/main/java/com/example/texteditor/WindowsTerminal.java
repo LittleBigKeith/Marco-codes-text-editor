@@ -1,7 +1,5 @@
 package com.example.texteditor;
 
-import java.util.List;
-
 import com.sun.jna.Pointer;
 import com.sun.jna.ptr.LongByReference;
 
@@ -144,13 +142,13 @@ public class WindowsTerminal extends Terminal {
     }
 
     @Override
-    int getLineWidth(List<String> content, int cursorY) {
+    public int getLineWidth(String line, int columns) {
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'getLineWidth'");
     }
 
     @Override
-    int getLineWidthUpTo(List<String> content, int cursorY, int cursorX) {
+    public int getLineWidthUpTo(String line, int cursorX, int columns) {
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'getLineWidthUpTo'");
     }
