@@ -43,6 +43,7 @@ public class FileHandler {
         
         if (args.length == 1) {
             readFile();
+            
         } else {
             content = new ArrayList<>();
             content.add("");
@@ -63,6 +64,9 @@ public class FileHandler {
 
         try (Stream<String> stream = Files.lines(path)){
             content = stream.collect(Collectors.toList());
+            if (content.isEmpty()) {
+                content.add("");
+            }
         } catch (IOException e) {
             System.err.println("Error reading file '" + path.normalize().toString() + "': " + e.getMessage());
         }

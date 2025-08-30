@@ -47,10 +47,11 @@ public abstract class Terminal {
         for (int i = 0; i <= rows - cursor.getPageWrap(); i++) {
             if (i + cursor.getOffsetY() >= content.size()) {
                 builder.append("~");  // draw ~
+                builder.append("\033[K\r\n");
             } else {
                 String buffer = content.get(i + cursor.getOffsetY());
                 int wrap = cursor.getWrap(buffer, columns, this);
-                if (wrap < rows - cursor.getPageWrap() - i + 1) {
+                if (wrap < rows - cursor.getPageWrap() - i + 1 || wrap >= rows - 1) {
                     builder.append(buffer);  // draw a line of content
                     usedRows += cursor.getWrap(buffer, columns, this) + 1;
                 } else {
@@ -60,8 +61,10 @@ public abstract class Terminal {
                     break;
                 }
                 cursor.addPageWrap(wrap);
+                int lineLength = content.get(i + cursor.getOffsetY()).length();
+                boolean isLineFull = lineLength > 0 && (lineLength % columns == 0);
+                builder.append(isLineFull ? "\033[\r\n" : "\033[K\r\n");  // draw new line character
             }
-            builder.append("\033[K\r\n");  // draw new line character
         }
     }
 
@@ -77,7 +80,7 @@ public abstract class Terminal {
 
     private void drawStatusBarMessage(StringBuilder builder, Cursor cursor, List<String> content) {
         String statusBarMessage = this.statusBarMessage.isEmpty() ?
-            "R: " + usedRows + " cX: " + cursor.getCursorX() + " cY: " + cursor.getCursorY() + " oY: " + cursor.getOffsetY() + " pw: " + cursor.getPageWrap() + " cw: " + cursor.getCursorWrap() + " hw: " + cursor.getHiddenWrap() + " lw: " + getLineWidthUpTo(content.get(cursor.getCursorY()), cursor.getCursorX(), columns) :
+            "R: " + usedRows + " cY: " + cursor.getCursorY() + " oY: " + cursor.getOffsetY() + " pw: " + cursor.getPageWrap() + " cw: " + cursor.getCursorWrap() + " hw: " + cursor.getHiddenWrap() :
             this.statusBarMessage;
         builder.append(statusBarMessage).append(String.join("", Collections.nCopies(Math.max(0, (columns - statusBarMessage.length())), " ")));
         builder.append("\033[0m"); // Reset ANSI attributes to normal
@@ -87,7 +90,10 @@ public abstract class Terminal {
      * Positions the cursor on the screen.
      */
     private void drawCursor(StringBuilder builder, List<String> content, Cursor cursor) {
-        builder.append(String.format("\033[%d;%dH", cursor.getCursorY() - cursor.getOffsetY() + cursor.getCursorWrap() - cursor.getHiddenWrap() + getLineWidthUpTo(content.get(cursor.getCursorY()), cursor.getCursorX(), columns) / columns + 1, getLineWidthUpTo(content.get(cursor.getCursorY()), cursor.getCursorX(), columns) % columns + 1));
+        String line = content.isEmpty() ? "" : content.get(cursor.getCursorY());
+        int cursorY = Math.min(cursor.getCursorY() - cursor.getOffsetY() + cursor.getCursorWrap() - cursor.getHiddenWrap() + getLineWidthUpTo(line, cursor.getCursorX(), columns) / columns + 1, rows + 1);
+        int cursorX = getLineWidthUpTo(line, cursor.getCursorX(), columns) % columns + 1;
+        builder.append(String.format("\033[%d;%dH", cursorY, cursorX));
     }
 
     /**
@@ -165,13 +171,13 @@ public abstract class Terminal {
      * @param content    The list of text lines in the editor.
      */
     public void handleKey(int keyPressed, Cursor cursor, List<String> content) {
-        cursor.editContent(keyPressed, content, byteBuffer);
+        cursor.editContent(keyPressed, content, byteBuffer, columns, this);
         cursor.moveCursor(keyPressed, content, this, usedRows, columns);
         cursor.scroll(keyPressed, content, rows, columns, this);
     }
 
     public void handleKey(int keyPressed, Cursor cursor, List<String> content, int targetRow, int targetCol) {
-        cursor.editContent(keyPressed, content, byteBuffer);
+        cursor.editContent(keyPressed, content, byteBuffer, columns, this);
         cursor.moveCursor(keyPressed, content, this, usedRows, columns, targetRow, targetCol);
         cursor.scroll(keyPressed, content, rows, columns, this);
     }

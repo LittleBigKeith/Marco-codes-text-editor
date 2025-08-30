@@ -104,8 +104,6 @@ public class TextEditor {
             cursor.resetContentChanged();
         } else if (keyPressed == ctrl('h')) {
             keyPressed = TextEditor.BACKSPACE;
-        } else if (keyPressed == ctrl('v')) {
-            
         }
         return keyPressed;
     }

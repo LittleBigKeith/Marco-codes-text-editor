@@ -6,7 +6,7 @@ import java.util.ArrayList;
 
 public class ByteBuffer {
 
-    public final static int BYTEBUFFER_LEN = 6;
+    public final static int BYTEBUFFER_LEN = 32767;
     private byte[] byteBuffer;
     private int index;
 

@@ -1,5 +1,6 @@
 package com.example.texteditor;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -20,6 +21,7 @@ public class Cursor {
 
     private boolean contentChanged;
     private int backspaceCache;
+    List<Byte> byteCache = new ArrayList<>();
 
     /**
      * Constructs a new Cursor with initialized position and scroll state.
@@ -76,7 +78,7 @@ public class Cursor {
                 handleEnterScroll(content, rows, columns, terminal);
                 break;
             default:
-                if (!Character.isISOControl(key) && key < 128) {
+                if (!Character.isISOControl(key)) {
                     handleInsertCharScroll(content, rows, columns, terminal);
                 }
         }
@@ -100,7 +102,8 @@ public class Cursor {
      * Handles scrolling logic for inserting a character.
      */
     private void handleInsertCharScroll(List<String> content, int rows, int columns, Terminal terminal) {
-        if (cursorY + cursorWrap + getWrap(content.get(cursorY), columns, terminal) > offsetY + hiddenWrap + rows) {
+        int currentLineWrap = getWrap(content.get(cursorY), columns, terminal);
+        if (cursorY + cursorWrap + currentLineWrap > offsetY + hiddenWrap + rows && currentLineWrap < rows - 1) {
             hiddenWrap += getWrap(content.get(offsetY), columns, terminal);
             offsetY = Math.min(offsetY + 1, content.size());
         }
@@ -368,10 +371,10 @@ public class Cursor {
      * Moves the cursor when insert one character.
      */
     private void moveCursorInsertChar(List<String> content, int columns, Terminal terminal) {
-        int codePoint = content.get(cursorY).codePointAt(cursorX);
-        setCursorX(cursorX + Character.charCount(codePoint));
-        if (cursorY > 0) {
-            cursorWrap += getWrap(content.get(cursorY - 1), columns, terminal);
+        String insertedString = new String(getByateArray(byteCache));
+        for (int i = 0; i < insertedString.length(); i++) {
+            int codePoint = insertedString.codePointAt(i);
+            setCursorX(cursorX + Character.charCount(codePoint));
         }
     }
 
@@ -401,7 +404,7 @@ public class Cursor {
      * @param key     The key code representing the user input.
      * @param content The list of text lines in the editor.
      */
-    public void editContent(int key, List<String> content, ByteBuffer byteBuffer) {
+    public void editContent(int key, List<String> content, ByteBuffer byteBuffer, int columns, Terminal terminal) {
         if (content.size() <= 0) {
             return;
         }
@@ -428,7 +431,7 @@ public class Cursor {
             case TextEditor.PAGE_UP:
                 break;
             default:
-                editContentInsertChar(key, content, byteBuffer);
+                editContentInsertChar(key, content, byteBuffer, columns, terminal);
         }
     }
 
@@ -461,11 +464,36 @@ public class Cursor {
         contentChanged = true;
     }
 
-    private void editContentInsertChar(int key, List<String> content, ByteBuffer byteBuffer) {
+    private void editContentInsertChar(int key, List<String> content, ByteBuffer byteBuffer, int columns, Terminal terminal) {
+        byteCache.clear();
         if (!Character.isISOControl(key)) {
-            content.set(cursorY, String.join("", content.get(cursorY).substring(0, cursorX), new String(byteBuffer.getFilteredBuffer()), content.get(cursorY).substring(cursorX)));
+            for (byte b : byteBuffer.getFilteredBuffer()) {
+                if (b == TextEditor.ENTER) {
+                    writeToContent(content, byteCache);
+                    cursorX += new String(getByateArray(byteCache)).length();
+                    byteCache.clear();
+                    editContentEnter(content);
+                    moveCursorEnter(cursorY, content, columns, terminal);
+                } else {
+                    byteCache.add(b);
+                }
+            }
+            writeToContent(content, byteCache);
             contentChanged = true;
         }
+    }
+
+    private void writeToContent(List<String> content, List<Byte> byteCache) {
+        byte[] byteArray = getByateArray(byteCache);
+        content.set(cursorY, String.join("", content.get(cursorY).substring(0, cursorX), new String(byteArray), content.get(cursorY).substring(cursorX)));
+    }
+
+    private byte[] getByateArray(List<Byte> byteCache) {
+        byte[] byteArray = new byte[byteCache.size()];
+        for (int i = 0; i < byteCache.size(); i++) {
+            byteArray[i] = byteCache.get(i);
+        }
+        return byteArray;
     }
 
     private void editContentEnter(List<String> content) {
