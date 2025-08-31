@@ -27,6 +27,8 @@ interface LibC extends Library {
     static final int VTIME = 17;
     static final long TIOCGWINSZ = Platform.isMac()? Ioccom._IOR('t', 104) : 0x5413;
 
+    static final int LC_ALL = 0;
+
     /**
      * Represents the terminal window size structure.
      */
@@ -100,4 +102,8 @@ interface LibC extends Library {
      * Performs an ioctl operation to get window size.
      */
     int ioctl(int fd, long request, Winsize winSize);
+
+    String setlocale(int category, String locale);
+    
+    int wcwidth(long wc);
 }

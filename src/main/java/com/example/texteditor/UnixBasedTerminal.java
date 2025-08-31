@@ -1,11 +1,9 @@
 package com.example.texteditor;
 
-import java.util.List;
-
 /**
  * Handles terminal operations, including raw mode configuration, screen rendering, and keypress handling.
  */
-public class UnixBasedTerminal extends IOHandler implements Terminal {
+public class UnixBasedTerminal extends Terminal {
 
     private static LibC.Termios originalAttributes; // Original terminal attributes to restore on exit
 
@@ -42,6 +40,7 @@ public class UnixBasedTerminal extends IOHandler implements Terminal {
         LibC.INSTANCE.tcsetattr(LibC.SYSTEM_OUT_FD, LibC.TCSAFLUSH, termios);
     }
     
+    @Override
     public void disableRawMode() {
         LibC.INSTANCE.tcsetattr(LibC.SYSTEM_OUT_FD, LibC.TCSAFLUSH, originalAttributes);  // Restore original terminal attributes before exiting
     }
@@ -82,21 +81,35 @@ public class UnixBasedTerminal extends IOHandler implements Terminal {
         System.exit(0);
     }
 
-    /**
-     * Update status bar message and refresh terminal screen.
-     */ 
-    public void updateStatusBarMessage(String message, Cursor cursor, List<String> content) {
-        super.setStatusBarTextColor(30);
-        super.setStatusBarMessage(message);
-        refreshScreen(content, cursor);
+    @Override
+    public void setLocale() {
+        String locale = LibC.INSTANCE.setlocale(LibC.LC_ALL, "");
+        if (locale == null) {
+            System.err.println("Failed to set locale");
+            System.exit(-1);
+        }
     }
 
-    public void updateStatusBarMessage(String message, Cursor cursor, List<String> content, int textColor) {
-        super.setStatusBarMessage(message);
-        refreshScreen(content, cursor, textColor);
+    public int getCharWidth(long wc) {
+        int charWidth = LibC.INSTANCE.wcwidth(wc);
+        return charWidth > 0 ? charWidth : 0;
+    }
+    
+    @Override
+    public int getLineWidth(String line, int columns) {
+        int lineWidth = 0;
+        for (char c : line.toCharArray()) {
+            if (lineWidth % columns + getCharWidth(c) > columns) {
+                lineWidth += columns - lineWidth % columns;
+            }
+            lineWidth += getCharWidth(c);
+        }
+        return lineWidth;
     }
 
-    public int getStatusBarTextColor() {
-        return super.getStatusBarTextColor();
+    @Override
+    public int getLineWidthUpTo(String line, int cursorX, int columns) {
+        return getLineWidth(line.substring(0, cursorX), columns);
     }
+    
 }

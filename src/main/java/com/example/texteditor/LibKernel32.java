@@ -88,4 +88,6 @@ interface LibKernel32 extends Library {
      * @return True if successful, false otherwise.
      */
     boolean GetConsoleScreenBufferInfo(Pointer hConsoleOutput, ConsoleScreenBufferInfo csbiInfo);
+
+    boolean SetThreadLocale(int Locale);
 }
