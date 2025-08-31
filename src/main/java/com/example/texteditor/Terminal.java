@@ -50,6 +50,11 @@ public abstract class Terminal {
                 builder.append("\033[K\r\n");
             } else {
                 String buffer = content.get(i + cursor.getOffsetY());
+                if (cursor.getCursorX() < (rows + 1) * columns) {
+                    buffer = buffer.substring(0, Math.min(buffer.length(), (rows + 1) * columns));
+                } else {
+                    buffer = buffer.substring(cursor.getCursorX() - (rows + 1) * columns + 1, Math.min(buffer.length(), cursor.getCursorX() + 1));
+                }
                 int wrap = cursor.getWrap(buffer, columns, this);
                 if (wrap < rows - cursor.getPageWrap() - i + 1 || wrap >= rows - 1) {
                     builder.append(buffer);  // draw a line of content
@@ -90,9 +95,17 @@ public abstract class Terminal {
      * Positions the cursor on the screen.
      */
     private void drawCursor(StringBuilder builder, List<String> content, Cursor cursor) {
+        int cursorX, cursorY = 0;
         String line = content.isEmpty() ? "" : content.get(cursor.getCursorY());
-        int cursorY = Math.min(cursor.getCursorY() - cursor.getOffsetY() + cursor.getCursorWrap() - cursor.getHiddenWrap() + getLineWidthUpTo(line, cursor.getCursorX(), columns) / columns + 1, rows + 1);
-        int cursorX = getLineWidthUpTo(line, cursor.getCursorX(), columns) % columns + 1;
+        if (cursor.getCursorX() < (rows + 1) * columns) {
+            line = line.substring(0, Math.min(line.length(), (rows + 1) * columns));
+            cursorY = Math.min(cursor.getCursorY() - cursor.getOffsetY() + cursor.getCursorWrap() - cursor.getHiddenWrap() + getLineWidthUpTo(line, cursor.getCursorX(), columns) / columns + 1, rows + 1);
+            cursorX = getLineWidthUpTo(line, cursor.getCursorX(), columns) % columns + 1;
+        } else {
+            line = line.substring(cursor.getCursorX() - (rows + 1) * columns + 1, Math.min(line.length(), cursor.getCursorX() + 1));
+            cursorY = rows + 1;
+            cursorX = columns;
+        }
         builder.append(String.format("\033[%d;%dH", cursorY, cursorX));
     }
 
