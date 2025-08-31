@@ -92,7 +92,7 @@ public class Cursor {
     }
 
     private void moveCursorIntoView(List<String> content, int rows, int columns, Terminal terminal) {
-        while (cursorY + cursorWrap + getWrap(content.get(cursorY), columns, terminal) > offsetY + hiddenWrap + rows) {
+        if (cursorY + cursorWrap + getWrap(content.get(cursorY), columns, terminal) > offsetY + hiddenWrap + rows) {
             hiddenWrap += getWrap(content.get(offsetY), columns, terminal);
             offsetY = Math.min(offsetY + 1, content.size());
         }
@@ -114,13 +114,9 @@ public class Cursor {
      */
     private void handleArrowUpScroll(List<String> content, int columns, Terminal terminal) {
         if (cursorY < offsetY) {
-            scrollUpOneLine(content, columns, terminal);
+            offsetY = Math.max(offsetY - 1, 0);
+            hiddenWrap -= getWrap(content.get(cursorY), columns, terminal);
         }
-    }
-
-    private void scrollUpOneLine(List<String> content, int columns, Terminal terminal) {
-        offsetY = Math.max(offsetY - 1, 0);
-        hiddenWrap -= getWrap(content.get(cursorY), columns, terminal);
     }
     
     /**
@@ -175,7 +171,8 @@ public class Cursor {
 
     private void handleBackspaceScroll(List<String> content, int columns, Terminal terminal) {
         if (cursorY < offsetY) {
-            scrollUpOneLine(content, columns, terminal);
+            offsetY = Math.max(offsetY - 1, 0);
+            hiddenWrap -= getWrap(content.get(cursorY).substring(0, cursorXcache), columns, terminal);
         }
     }
 
