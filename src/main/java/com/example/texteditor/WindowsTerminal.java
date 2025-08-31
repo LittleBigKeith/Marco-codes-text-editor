@@ -9,6 +9,8 @@ import com.sun.jna.ptr.LongByReference;
  */
 public class WindowsTerminal extends Terminal {
 
+    private final static int LOCALE_SYSTEM_DEFAULT = 0x0800;
+
     // Static handles for console input and output.
     private static Pointer outHandle;
     private static Pointer inHandle;
@@ -132,25 +134,30 @@ public class WindowsTerminal extends Terminal {
     }
 
     public void setLocale() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'setLocale'");
+        LibKernel32.INSTANCE.SetThreadLocale(LOCALE_SYSTEM_DEFAULT);
     }
 
     public int getCharWidth(long wc) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'getCharWidth'");
+        // TODO: Implement for WINDOWS
+        
+        return 1;
     }
 
     @Override
     public int getLineWidth(String line, int columns) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'getLineWidth'");
+        int lineWidth = 0;
+        for (char c : line.toCharArray()) {
+            if (lineWidth % columns + getCharWidth(c) > columns) {
+                lineWidth += columns - lineWidth % columns;
+            }
+            lineWidth += getCharWidth(c);
+        }
+        return lineWidth;
     }
 
     @Override
     public int getLineWidthUpTo(String line, int cursorX, int columns) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'getLineWidthUpTo'");
+        return getLineWidth(line.substring(0, cursorX), columns);
     }
    
 }
